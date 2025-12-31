@@ -20,7 +20,7 @@ type HoldCreator interface {
 func HandleCreateHold(svc HoldCreator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
 			return
 		}
 
@@ -28,11 +28,20 @@ func HandleCreateHold(svc HoldCreator) http.HandlerFunc {
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, codeInvalidRequestBody, "invalid request body")
 			return
 		}
 		if err := req.validate(); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			switch err {
+			case errEventZoneRequired:
+				writeError(w, http.StatusBadRequest, codeMissingRequiredField, err.Error())
+			case domain.ErrIdempotencyKeyRequired:
+				writeError(w, http.StatusBadRequest, codeIdempotencyRequired, err.Error())
+			case domain.ErrInvalidQuantity:
+				writeError(w, http.StatusBadRequest, codeInvalidQuantity, err.Error())
+			default:
+				writeError(w, http.StatusBadRequest, codeInvalidRequestBody, err.Error())
+			}
 			return
 		}
 
@@ -45,25 +54,25 @@ func HandleCreateHold(svc HoldCreator) http.HandlerFunc {
 		if err != nil {
 			switch err {
 			case domain.ErrInvalidQuantity:
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, codeInvalidQuantity, err.Error())
 				return
 			case domain.ErrInvalidID:
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, codeInvalidID, err.Error())
 				return
 			case domain.ErrIdempotencyKeyRequired:
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, codeIdempotencyRequired, err.Error())
 				return
 			case domain.ErrZoneNotFound:
-				http.Error(w, err.Error(), http.StatusNotFound)
+				writeError(w, http.StatusNotFound, codeZoneNotFound, err.Error())
 				return
 			case domain.ErrIdempotencyConflict:
-				http.Error(w, err.Error(), http.StatusConflict)
+				writeError(w, http.StatusConflict, codeIdempotencyConflict, err.Error())
 				return
 			case domain.ErrInsufficientCapacity:
-				http.Error(w, err.Error(), http.StatusConflict)
+				writeError(w, http.StatusConflict, codeInsufficientCapacity, err.Error())
 				return
 			default:
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
 				return
 			}
 		}
@@ -87,9 +96,11 @@ type createHoldRequest struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
+var errEventZoneRequired = errors.New("event_id and zone_id are required")
+
 func (r createHoldRequest) validate() error {
 	if r.EventID == "" || r.ZoneID == "" {
-		return errors.New("event_id and zone_id are required")
+		return errEventZoneRequired
 	}
 	if r.IdempotencyKey == "" {
 		return domain.ErrIdempotencyKeyRequired

@@ -5,6 +5,14 @@ High-scale ticketing prototype focused on:
 - Holds with TTL
 - Eventually: waiting room, payments, anti-bot, SRE hardening
 
+## Domain concepts (short)
+- Event: the ticketed experience (concert/show), groups zones.
+- Zone: a sellable area within an event, with a fixed capacity.
+- Hold: temporary reservation of tickets in a zone (has TTL).
+- Confirmation (order): finalizes a hold into a purchase.
+
+Full reference: `docs/concepts.md`
+
 ## Quickstart (local)
 Requirements:
 - Docker + Docker Compose
@@ -20,11 +28,17 @@ Services:
 
 API (default config)
 - Base URL: `http://localhost:8080`
-- Env: `DATABASE_URL` (defaults to `postgres://ultimate_ticket:ultimate_ticket@localhost:5432/ultimate_ticket?sslmode=disable`)
+- Env:
+  - `PORT` (default: `8080`)
+  - `DATABASE_URL` (default: `postgres://ultimate_ticket:ultimate_ticket@localhost:5432/ultimate_ticket?sslmode=disable`)
+  - `CORS_ORIGINS` (comma-separated, e.g. `http://localhost:5173`)
 - Endpoints:
   - `GET /health` → `ok`
   - `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}` (409 on capacity or idempotency conflict)
   - `POST /holds/{id}/confirm` with header `Idempotency-Key` (201 created, 200 idempotent retry)
+  - Admin (local tooling only):
+    - `POST /admin/events` + `GET /admin/events`
+    - `POST /admin/events/{event_id}/zones` + `GET /admin/events/{event_id}/zones`
 
 Migrations:
 - Applied on startup and recorded in `schema_migrations`.
@@ -60,7 +74,7 @@ curl -s -X POST http://localhost:8080/holds \
 ```
 Expected response (409):
 ```json
-idempotency conflict
+{"error":"idempotency conflict","code":"idempotency_conflict"}
 ```
 
 ```bash
@@ -82,6 +96,37 @@ Expected response (200):
 ```json
 {"id":"<order_id>","hold_id":"<hold_id>","status":"confirmed","created_at":"<created_at>"}
 ```
+
+Error format:
+```json
+{"error":"<message>","code":"<code>"}
+```
+
+Full reference: `docs/api/error-codes.md`
+
+## Frontend (local)
+This frontend is intentionally minimal and decoupled. It reads variables from the
+repo root `.env` (see `.env.example`).
+
+Setup:
+```bash
+cp .env.example .env
+```
+
+Run backend (from repo root; `.env` is auto-loaded if present):
+```bash
+make run
+```
+
+Run frontend:
+```bash
+make frontend-install
+make frontend-run
+```
+
+Frontend env variables (from `.env`):
+- `VITE_API_BASE_URL` (e.g. `http://localhost:8080`)
+- `FRONTEND_PORT` (default: `5173`)
 ## Common commands (from repo root)
 ```bash
 make test

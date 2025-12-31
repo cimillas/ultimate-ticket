@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ultimate Ticket Console</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f1ea;
+        --bg-2: #fdfbf8;
+        --panel: #ffffff;
+        --ink: #1b1b1b;
+        --muted: #6b635a;
+        --stroke: #e2d9cf;
+        --accent: #2f6b66;
+        --accent-2: #24524e;
+        --left-col-width: clamp(320px, 40vw, 520px);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Source Sans 3", sans-serif;
+        color: var(--ink);
+        background: linear-gradient(160deg, var(--bg) 0%, var(--bg-2) 100%);
+        min-height: 100vh;
+      }
+
+      main {
+        max-width: 1200px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 32px 24px 48px;
+        display: grid;
+        gap: 20px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, var(--left-col-width)) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      .stack {
+        display: grid;
+        gap: 20px;
+        align-items: start;
+        justify-items: start;
+        width: var(--left-col-width);
+        max-width: 100%;
+      }
+
+      .response-panel {
+        position: sticky;
+        top: 20px;
+        width: 100%;
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+
+      header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      section {
+        background: var(--panel);
+        border: 1px solid var(--stroke);
+        border-radius: 12px;
+        padding: 16px 18px;
+        display: grid;
+        gap: 12px;
+        animation: fadeUp 0.4s ease both;
+      }
+
+      .input-section {
+        width: 100%;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      form,
+      .form-block {
+        display: grid;
+        gap: 10px;
+        width: 100%;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 14px;
+      }
+
+      input {
+        padding: 8px 10px;
+        border: 1px solid var(--stroke);
+        border-radius: 8px;
+        font-size: 14px;
+        width: 100%;
+      }
+
+      button {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+      }
+
+      button:hover {
+        background: var(--accent-2);
+      }
+
+      pre {
+        margin: 0;
+        padding: 12px;
+        background: #f3ede6;
+        border: 1px dashed var(--stroke);
+        border-radius: 10px;
+        min-height: 120px;
+        overflow-x: auto;
+        font-size: 13px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 600px) {
+        main {
+          padding: 24px 16px 40px;
+        }
+
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .response-panel {
+          position: static;
+        }
+
+        .stack {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Ultimate Ticket Console</h1>
+        <p>Local tools for events, zones, holds, and confirms.</p>
+      </header>
+
+      <div class="layout">
+        <div class="stack">
+          <section class="input-section">
+            <h2>Create event</h2>
+            <form id="create-event">
+              <label>
+                Name
+                <input name="name" required />
+              </label>
+              <label>
+                Starts at (RFC3339)
+                <input name="starts_at" placeholder="2025-02-01T10:00:00Z" />
+              </label>
+              <button type="submit">Create event</button>
+            </form>
+          </section>
+
+          <section class="input-section">
+            <h2>List events</h2>
+            <div class="form-block">
+              <button id="list-events" type="button">List events</button>
+            </div>
+          </section>
+
+          <section class="input-section">
+            <h2>Create zone</h2>
+            <form id="create-zone">
+              <label>
+                Event ID
+                <input name="event_id" required />
+              </label>
+              <label>
+                Name
+                <input name="name" required />
+              </label>
+              <label>
+                Capacity
+                <input name="capacity" type="number" min="1" required />
+              </label>
+              <button type="submit">Create zone</button>
+            </form>
+          </section>
+
+          <section class="input-section">
+            <h2>List zones</h2>
+            <form id="list-zones">
+              <label>
+                Event ID
+                <input name="event_id" required />
+              </label>
+              <button type="submit">List zones</button>
+            </form>
+          </section>
+
+          <section class="input-section">
+            <h2>Holds</h2>
+            <form id="create-hold">
+              <label>
+                Event ID
+                <input name="event_id" required />
+              </label>
+              <label>
+                Zone ID
+                <input name="zone_id" required />
+              </label>
+              <label>
+                Quantity
+                <input name="quantity" type="number" min="1" required />
+              </label>
+              <label>
+                Idempotency Key
+                <input name="idempotency_key" required />
+              </label>
+              <button type="submit">Create hold</button>
+            </form>
+          </section>
+
+          <section class="input-section">
+            <h2>Confirm hold</h2>
+            <form id="confirm-hold">
+              <label>
+                Hold ID
+                <input name="hold_id" required />
+              </label>
+              <label>
+                Idempotency Key
+                <input name="idempotency_key" required />
+              </label>
+              <button type="submit">Confirm hold</button>
+            </form>
+          </section>
+        </div>
+
+        <section class="response-panel">
+          <h2>Response</h2>
+          <pre id="output"></pre>
+        </section>
+      </div>
+
+      <script type="module" src="/src/main.js"></script>
+    </main>
+  </body>
+</html>

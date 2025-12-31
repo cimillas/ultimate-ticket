@@ -1,6 +1,7 @@
-.PHONY: help test run fmt vet tidy lint build
+.PHONY: help test run fmt vet tidy lint build frontend-install frontend-run frontend-build frontend-preview
 
 API_DIR := services/api
+FRONTEND_DIR := frontend
 GO := go
 
 help:
@@ -12,12 +13,19 @@ help:
 	@printf "  tidy  - tidy Go modules\n"
 	@printf "  lint  - run golangci-lint if installed\n"
 	@printf "  build - build the API binary\n"
+	@printf "  frontend-install - install frontend deps via nvm\n"
+	@printf "  frontend-run     - run the frontend dev server via nvm\n"
+	@printf "  frontend-build   - build the frontend via nvm\n"
+	@printf "  frontend-preview - preview the frontend build via nvm\n"
 
 test:
 	@cd $(API_DIR) && $(GO) test ./...
 
 run:
-	@cd $(API_DIR) && $(GO) run ./cmd/api
+	@cd $(API_DIR) && \
+	$(GO) run ./cmd/api & pid=$$!; \
+	trap 'kill -INT $$pid; wait $$pid; exit 0' INT TERM; \
+	wait $$pid
 
 fmt:
 	@cd $(API_DIR) && $(GO) fmt ./...
@@ -38,3 +46,15 @@ lint:
 
 build:
 	@cd $(API_DIR) && $(GO) build ./cmd/api
+
+frontend-install:
+	@bash -lc 'if [ -s "$$HOME/.nvm/nvm.sh" ]; then source "$$HOME/.nvm/nvm.sh"; nvm use >/dev/null; cd $(FRONTEND_DIR) && npm install; else echo "nvm not found in $$HOME/.nvm"; exit 1; fi'
+
+frontend-run:
+	@bash -lc 'if [ -s "$$HOME/.nvm/nvm.sh" ]; then source "$$HOME/.nvm/nvm.sh"; nvm use >/dev/null; cd $(FRONTEND_DIR) && npm run dev; else echo "nvm not found in $$HOME/.nvm"; exit 1; fi'
+
+frontend-build:
+	@bash -lc 'if [ -s "$$HOME/.nvm/nvm.sh" ]; then source "$$HOME/.nvm/nvm.sh"; nvm use >/dev/null; cd $(FRONTEND_DIR) && npm run build; else echo "nvm not found in $$HOME/.nvm"; exit 1; fi'
+
+frontend-preview:
+	@bash -lc 'if [ -s "$$HOME/.nvm/nvm.sh" ]; then source "$$HOME/.nvm/nvm.sh"; nvm use >/dev/null; cd $(FRONTEND_DIR) && npm run preview; else echo "nvm not found in $$HOME/.nvm"; exit 1; fi'

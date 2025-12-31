@@ -44,6 +44,8 @@ During development we run dependencies via Docker.
 Alternative from repo root:
 - Run unit tests: `make test`
 - Run API: `make run`
+- Frontend install: `make frontend-install`
+- Frontend run: `make frontend-run`
 - Format: `make fmt`
 - Vet: `make vet`
 - Tidy: `make tidy`
@@ -53,10 +55,15 @@ Alternative from repo root:
 Local dependencies:
 - Postgres @ `localhost:5432` (user/password/db: `ultimate_ticket`)
 - API expects `DATABASE_URL` (defaults to the local Postgres DSN above)
+- CORS allow-list via `CORS_ORIGINS` (comma-separated)
+ - `.env` is auto-loaded when present (current dir or parent directories)
 
 API endpoints:
 - `POST /holds` expects `idempotency_key` in the JSON body.
 - `POST /holds/{id}/confirm` expects `Idempotency-Key` header.
+- Admin (local tooling only):
+  - `POST /admin/events` + `GET /admin/events`
+  - `POST /admin/events/{event_id}/zones` + `GET /admin/events/{event_id}/zones`
 
 If any command changes, update this file and the main README.
 

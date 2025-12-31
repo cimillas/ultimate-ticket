@@ -22,19 +22,19 @@ type HoldConfirmer interface {
 func HandleConfirmHold(svc HoldConfirmer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
 			return
 		}
 
 		holdID, ok := parseConfirmHoldPath(r.URL.Path)
 		if !ok {
-			http.NotFound(w, r)
+			writeError(w, http.StatusNotFound, codeNotFound, "not found")
 			return
 		}
 
 		key := r.Header.Get(idempotencyHeader)
 		if key == "" {
-			http.Error(w, domain.ErrIdempotencyKeyRequired.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, codeIdempotencyRequired, domain.ErrIdempotencyKeyRequired.Error())
 			return
 		}
 
@@ -45,19 +45,23 @@ func HandleConfirmHold(svc HoldConfirmer) http.HandlerFunc {
 		if err != nil {
 			switch err {
 			case domain.ErrHoldNotFound:
-				http.Error(w, err.Error(), http.StatusNotFound)
+				writeError(w, http.StatusNotFound, codeHoldNotFound, err.Error())
 				return
 			case domain.ErrInvalidID:
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusNotFound, codeInvalidID, err.Error())
 				return
 			case domain.ErrHoldExpired, domain.ErrHoldAlreadyConfirmed:
-				http.Error(w, err.Error(), http.StatusConflict)
+				code := codeHoldAlreadyConfirmed
+				if err == domain.ErrHoldExpired {
+					code = codeHoldExpired
+				}
+				writeError(w, http.StatusConflict, code, err.Error())
 				return
 			case domain.ErrIdempotencyKeyRequired:
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, codeIdempotencyRequired, err.Error())
 				return
 			default:
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
 				return
 			}
 		}

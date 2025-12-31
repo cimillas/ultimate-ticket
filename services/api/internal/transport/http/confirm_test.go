@@ -64,7 +64,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			path:           "/holds/not-a-uuid/confirm",
 			idempotencyKey: "idem-1",
 			serviceErr:     domain.ErrInvalidID,
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name:           "hold expired",

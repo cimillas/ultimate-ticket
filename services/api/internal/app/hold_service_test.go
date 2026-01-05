@@ -15,8 +15,8 @@ func TestHoldService_CreateHold(t *testing.T) {
 	now := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 	ttl := 15 * time.Minute
 
-	makeSvc := func(zones []domain.Zone, holds []domain.Hold) (*HoldService, *fakeHoldRepo) {
-		repo := newFakeHoldRepo(zones, holds)
+	makeSvc := func(zones []domain.Zone, holds []domain.Hold, eventStarts map[string]time.Time) (*HoldService, *fakeHoldRepo) {
+		repo := newFakeHoldRepo(zones, holds, eventStarts, nil, now.Add(1*time.Hour))
 		svc := NewHoldService(repo, clock.NewFixed(now), WithHoldTTL(ttl))
 		return svc, repo
 	}
@@ -28,6 +28,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 				{EventID: "event-1", ZoneID: "zone-1", Quantity: 30, Status: domain.HoldStatusActive, ExpiresAt: now.Add(10 * time.Minute)},
 				{EventID: "event-1", ZoneID: "zone-1", Quantity: 20, Status: domain.HoldStatusConfirmed},
 			},
+			nil,
 		)
 
 		hold, err := svc.CreateHold(context.Background(), CreateHoldInput{
@@ -70,6 +71,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		svc, repo := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 50}},
 			[]domain.Hold{existing},
+			nil,
 		)
 
 		hold, err := svc.CreateHold(context.Background(), CreateHoldInput{
@@ -104,6 +106,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		svc, _ := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 50}},
 			[]domain.Hold{existing},
+			nil,
 		)
 
 		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
@@ -123,6 +126,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 			[]domain.Hold{
 				{EventID: "event-1", ZoneID: "zone-1", Quantity: 90, Status: domain.HoldStatusActive, ExpiresAt: now.Add(5 * time.Minute)},
 			},
+			nil,
 		)
 
 		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
@@ -148,6 +152,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 			[]domain.Hold{
 				{EventID: "event-1", ZoneID: "zone-1", Quantity: 80, Status: domain.HoldStatusActive, ExpiresAt: now.Add(-1 * time.Minute)},
 			},
+			nil,
 		)
 
 		hold, err := svc.CreateHold(context.Background(), CreateHoldInput{
@@ -168,6 +173,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		svc, _ := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 100}},
 			nil,
+			nil,
 		)
 
 		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
@@ -180,21 +186,76 @@ func TestHoldService_CreateHold(t *testing.T) {
 			t.Fatalf("expected ErrIdempotencyKeyRequired, got %v", err)
 		}
 	})
+
+	t.Run("rejects holds after event start", func(t *testing.T) {
+		svc, repo := makeSvc(
+			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 10}},
+			nil,
+			map[string]time.Time{"event-1": now.Add(-1 * time.Minute)},
+		)
+
+		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
+			EventID:        "event-1",
+			ZoneID:         "zone-1",
+			Quantity:       1,
+			IdempotencyKey: "idem-started",
+		})
+		if err != domain.ErrEventClosed {
+			t.Fatalf("expected ErrEventClosed, got %v", err)
+		}
+		if len(repo.holds) != 0 {
+			t.Fatalf("expected no holds created, got %d", len(repo.holds))
+		}
+		if repo.updatedEvents["event-1"] != domain.EventStatusClosed {
+			t.Fatalf("expected event to be closed, got %s", repo.updatedEvents["event-1"])
+		}
+	})
+
+	t.Run("rejects holds when event is cancelled", func(t *testing.T) {
+		repo := newFakeHoldRepo(
+			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 10}},
+			nil,
+			nil,
+			map[string]domain.EventStatus{"event-1": domain.EventStatusCancelled},
+			now.Add(1*time.Hour),
+		)
+		svc := NewHoldService(repo, clock.NewFixed(now), WithHoldTTL(ttl))
+
+		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
+			EventID:        "event-1",
+			ZoneID:         "zone-1",
+			Quantity:       1,
+			IdempotencyKey: "idem-cancelled",
+		})
+		if err != domain.ErrEventCancelled {
+			t.Fatalf("expected ErrEventCancelled, got %v", err)
+		}
+		if len(repo.holds) != 0 {
+			t.Fatalf("expected no holds created, got %d", len(repo.holds))
+		}
+	})
 }
 
 type fakeHoldRepo struct {
-	zones map[string]domain.Zone
-	holds []domain.Hold
+	zones             map[string]domain.Zone
+	holds             []domain.Hold
+	eventStarts       map[string]time.Time
+	eventStatuses     map[string]domain.EventStatus
+	defaultEventStart time.Time
+	updatedEvents     map[string]domain.EventStatus
 }
 
-func newFakeHoldRepo(zones []domain.Zone, holds []domain.Hold) *fakeHoldRepo {
+func newFakeHoldRepo(zones []domain.Zone, holds []domain.Hold, eventStarts map[string]time.Time, eventStatuses map[string]domain.EventStatus, defaultEventStart time.Time) *fakeHoldRepo {
 	z := make(map[string]domain.Zone)
 	for _, zone := range zones {
 		z[zoneKey(zone.EventID, zone.ID)] = zone
 	}
 	return &fakeHoldRepo{
-		zones: z,
-		holds: append([]domain.Hold{}, holds...),
+		zones:             z,
+		holds:             append([]domain.Hold{}, holds...),
+		eventStarts:       eventStarts,
+		eventStatuses:     eventStatuses,
+		defaultEventStart: defaultEventStart,
 	}
 }
 
@@ -202,12 +263,24 @@ func (f *fakeHoldRepo) WithTx(ctx context.Context, fn func(ctx context.Context) 
 	return fn(ctx)
 }
 
-func (f *fakeHoldRepo) GetZoneForUpdate(_ context.Context, eventID, zoneID string) (domain.Zone, error) {
+func (f *fakeHoldRepo) GetZoneForUpdate(_ context.Context, eventID, zoneID string) (domain.Zone, time.Time, domain.EventStatus, error) {
 	zone, ok := f.zones[zoneKey(eventID, zoneID)]
 	if !ok {
-		return domain.Zone{}, domain.ErrZoneNotFound
+		return domain.Zone{}, time.Time{}, "", domain.ErrZoneNotFound
 	}
-	return zone, nil
+	startsAt := f.defaultEventStart
+	if f.eventStarts != nil {
+		if override, ok := f.eventStarts[eventID]; ok {
+			startsAt = override
+		}
+	}
+	status := domain.EventStatusActive
+	if f.eventStatuses != nil {
+		if override, ok := f.eventStatuses[eventID]; ok {
+			status = override
+		}
+	}
+	return zone, startsAt, status, nil
 }
 
 func (f *fakeHoldRepo) FindHoldByIdempotencyKey(_ context.Context, eventID, zoneID, key string) (*domain.Hold, error) {
@@ -253,6 +326,18 @@ func (f *fakeHoldRepo) SumConfirmed(_ context.Context, eventID, zoneID string) (
 
 func (f *fakeHoldRepo) CreateHold(_ context.Context, hold domain.Hold) error {
 	f.holds = append(f.holds, hold)
+	return nil
+}
+
+func (f *fakeHoldRepo) UpdateEventStatus(_ context.Context, eventID string, status domain.EventStatus) error {
+	if f.updatedEvents == nil {
+		f.updatedEvents = make(map[string]domain.EventStatus)
+	}
+	f.updatedEvents[eventID] = status
+	if f.eventStatuses == nil {
+		f.eventStatuses = make(map[string]domain.EventStatus)
+	}
+	f.eventStatuses[eventID] = status
 	return nil
 }
 

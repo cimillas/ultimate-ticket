@@ -21,6 +21,9 @@ type AdminEventService interface {
 type AdminZoneService interface {
 	CreateZone(ctx context.Context, in app.CreateZoneInput) (domain.Zone, error)
 	ListZones(ctx context.Context, eventID string) ([]domain.Zone, error)
+	ListActiveHolds(ctx context.Context, eventID, zoneID string) ([]domain.Hold, error)
+	ListOrders(ctx context.Context, eventID, zoneID string) ([]domain.Order, error)
+	CancelEvent(ctx context.Context, eventID string) (domain.Event, error)
 }
 
 // HandleAdminEvents returns an HTTP handler for admin event creation/listing.
@@ -36,9 +39,12 @@ func HandleAdminEvents(svc AdminEventService) http.HandlerFunc {
 			resp := make([]eventResponse, 0, len(events))
 			for _, event := range events {
 				resp = append(resp, eventResponse{
-					ID:       event.ID,
-					Name:     event.Name,
-					StartsAt: event.StartsAt,
+					ID:          event.ID,
+					Name:        event.Name,
+					StartsAt:    event.StartsAt,
+					Status:      string(event.Status),
+					CancelledAt: event.CancelledAt,
+					IsComplete:  event.IsComplete,
 				})
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -82,9 +88,12 @@ func HandleAdminEvents(svc AdminEventService) http.HandlerFunc {
 			}
 
 			resp := eventResponse{
-				ID:       event.ID,
-				Name:     event.Name,
-				StartsAt: event.StartsAt,
+				ID:          event.ID,
+				Name:        event.Name,
+				StartsAt:    event.StartsAt,
+				Status:      string(event.Status),
+				CancelledAt: event.CancelledAt,
+				IsComplete:  event.IsComplete,
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
@@ -100,6 +109,109 @@ func HandleAdminEvents(svc AdminEventService) http.HandlerFunc {
 // HandleAdminZones returns an HTTP handler for admin zone creation/listing.
 func HandleAdminZones(svc AdminZoneService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if eventID, ok := parseAdminEventCancelPath(r.URL.Path); ok {
+			if r.Method != http.MethodPost {
+				writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
+				return
+			}
+
+			event, err := svc.CancelEvent(r.Context(), eventID)
+			if err != nil {
+				switch err {
+				case domain.ErrInvalidID:
+					writeError(w, http.StatusNotFound, codeInvalidID, err.Error())
+				case domain.ErrEventNotFound:
+					writeError(w, http.StatusNotFound, codeEventNotFound, err.Error())
+				default:
+					writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
+				}
+				return
+			}
+
+			resp := eventResponse{
+				ID:          event.ID,
+				Name:        event.Name,
+				StartsAt:    event.StartsAt,
+				Status:      string(event.Status),
+				CancelledAt: event.CancelledAt,
+				IsComplete:  event.IsComplete,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		if eventID, zoneID, resource, ok := parseAdminEventZoneResourcePath(r.URL.Path); ok {
+			if r.Method != http.MethodGet {
+				writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
+				return
+			}
+
+			switch resource {
+			case "holds":
+				holds, err := svc.ListActiveHolds(r.Context(), eventID, zoneID)
+				if err != nil {
+					switch err {
+					case domain.ErrInvalidID:
+						writeError(w, http.StatusNotFound, codeInvalidID, err.Error())
+					case domain.ErrEventNotFound:
+						writeError(w, http.StatusNotFound, codeEventNotFound, err.Error())
+					case domain.ErrZoneNotFound:
+						writeError(w, http.StatusNotFound, codeZoneNotFound, err.Error())
+					default:
+						writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
+					}
+					return
+				}
+				resp := make([]adminHoldResponse, 0, len(holds))
+				for _, hold := range holds {
+					resp = append(resp, adminHoldResponse{
+						ID:             hold.ID,
+						EventID:        hold.EventID,
+						ZoneID:         hold.ZoneID,
+						Quantity:       hold.Quantity,
+						Status:         string(hold.Status),
+						ExpiresAt:      hold.ExpiresAt,
+						IdempotencyKey: hold.IdempotencyKey,
+						CreatedAt:      hold.CreatedAt,
+					})
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(resp)
+				return
+			case "orders":
+				orders, err := svc.ListOrders(r.Context(), eventID, zoneID)
+				if err != nil {
+					switch err {
+					case domain.ErrInvalidID:
+						writeError(w, http.StatusNotFound, codeInvalidID, err.Error())
+					case domain.ErrEventNotFound:
+						writeError(w, http.StatusNotFound, codeEventNotFound, err.Error())
+					case domain.ErrZoneNotFound:
+						writeError(w, http.StatusNotFound, codeZoneNotFound, err.Error())
+					default:
+						writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
+					}
+					return
+				}
+				resp := make([]adminOrderResponse, 0, len(orders))
+				for _, order := range orders {
+					resp = append(resp, adminOrderResponse{
+						ID:             order.ID,
+						HoldID:         order.HoldID,
+						IdempotencyKey: order.IdempotencyKey,
+						CreatedAt:      order.CreatedAt,
+					})
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(resp)
+				return
+			default:
+				writeError(w, http.StatusNotFound, codeNotFound, "not found")
+				return
+			}
+		}
+
 		eventID, ok := parseAdminEventZonesPath(r.URL.Path)
 		if !ok {
 			writeError(w, http.StatusNotFound, codeNotFound, "not found")
@@ -123,10 +235,11 @@ func HandleAdminZones(svc AdminZoneService) http.HandlerFunc {
 			resp := make([]zoneResponse, 0, len(zones))
 			for _, zone := range zones {
 				resp = append(resp, zoneResponse{
-					ID:       zone.ID,
-					EventID:  zone.EventID,
-					Name:     zone.Name,
-					Capacity: zone.Capacity,
+					ID:        zone.ID,
+					EventID:   zone.EventID,
+					Name:      zone.Name,
+					Capacity:  zone.Capacity,
+					Available: zone.Available,
 				})
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -168,6 +281,10 @@ func HandleAdminZones(svc AdminZoneService) http.HandlerFunc {
 					writeError(w, http.StatusNotFound, codeEventNotFound, err.Error())
 				case domain.ErrZoneAlreadyExists:
 					writeError(w, http.StatusConflict, codeZoneAlreadyExists, err.Error())
+				case domain.ErrEventClosed:
+					writeError(w, http.StatusConflict, codeEventClosed, err.Error())
+				case domain.ErrEventCancelled:
+					writeError(w, http.StatusConflict, codeEventCancelled, err.Error())
 				default:
 					writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
 				}
@@ -175,10 +292,11 @@ func HandleAdminZones(svc AdminZoneService) http.HandlerFunc {
 			}
 
 			resp := zoneResponse{
-				ID:       zone.ID,
-				EventID:  zone.EventID,
-				Name:     zone.Name,
-				Capacity: zone.Capacity,
+				ID:        zone.ID,
+				EventID:   zone.EventID,
+				Name:      zone.Name,
+				Capacity:  zone.Capacity,
+				Available: zone.Available,
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
@@ -197,9 +315,12 @@ type createEventRequest struct {
 }
 
 type eventResponse struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	StartsAt time.Time `json:"starts_at"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	StartsAt    time.Time  `json:"starts_at"`
+	Status      string     `json:"status"`
+	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
+	IsComplete  bool       `json:"is_complete"`
 }
 
 type createZoneRequest struct {
@@ -208,10 +329,29 @@ type createZoneRequest struct {
 }
 
 type zoneResponse struct {
-	ID       string `json:"id"`
-	EventID  string `json:"event_id"`
-	Name     string `json:"name"`
-	Capacity int    `json:"capacity"`
+	ID        string `json:"id"`
+	EventID   string `json:"event_id"`
+	Name      string `json:"name"`
+	Capacity  int    `json:"capacity"`
+	Available int    `json:"available"`
+}
+
+type adminHoldResponse struct {
+	ID             string    `json:"id"`
+	EventID        string    `json:"event_id"`
+	ZoneID         string    `json:"zone_id"`
+	Quantity       int       `json:"quantity"`
+	Status         string    `json:"status"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type adminOrderResponse struct {
+	ID             string    `json:"id"`
+	HoldID         string    `json:"hold_id"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func parseAdminEventZonesPath(path string) (string, bool) {
@@ -226,4 +366,32 @@ func parseAdminEventZonesPath(path string) (string, bool) {
 		return "", false
 	}
 	return parts[2], true
+}
+
+func parseAdminEventCancelPath(path string) (string, bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) != 4 {
+		return "", false
+	}
+	if parts[0] != "admin" || parts[1] != "events" || parts[3] != "cancel" {
+		return "", false
+	}
+	if parts[2] == "" {
+		return "", false
+	}
+	return parts[2], true
+}
+
+func parseAdminEventZoneResourcePath(path string) (string, string, string, bool) {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) != 6 {
+		return "", "", "", false
+	}
+	if parts[0] != "admin" || parts[1] != "events" || parts[3] != "zones" {
+		return "", "", "", false
+	}
+	if parts[2] == "" || parts[4] == "" || parts[5] == "" {
+		return "", "", "", false
+	}
+	return parts[2], parts[4], parts[5], true
 }

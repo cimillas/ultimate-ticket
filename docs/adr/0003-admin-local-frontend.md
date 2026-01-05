@@ -22,6 +22,7 @@ We will:
 
 1. **Add admin-only endpoints under `/admin`**
    - `POST /admin/events` + `GET /admin/events`
+   - `POST /admin/events/{event_id}/cancel`
    - `POST /admin/events/{event_id}/zones` + `GET /admin/events/{event_id}/zones`
    These endpoints are for local tooling, not for end users.
 
@@ -35,6 +36,7 @@ We will:
 
 4. **Create a minimal Vite + Vanilla JS frontend**
    - No UX work; just forms for admin/event/zone creation and hold flows.
+   - Split the UI into a console (`/`) and a local admin view (`/admin`).
    - Intended for local use only.
 
 ## Consequences

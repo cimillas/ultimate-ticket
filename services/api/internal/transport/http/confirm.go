@@ -50,10 +50,17 @@ func HandleConfirmHold(svc HoldConfirmer) http.HandlerFunc {
 			case domain.ErrInvalidID:
 				writeError(w, http.StatusNotFound, codeInvalidID, err.Error())
 				return
-			case domain.ErrHoldExpired, domain.ErrHoldAlreadyConfirmed:
+			case domain.ErrHoldExpired, domain.ErrHoldAlreadyConfirmed, domain.ErrHoldInvalid, domain.ErrEventClosed, domain.ErrEventCancelled:
 				code := codeHoldAlreadyConfirmed
-				if err == domain.ErrHoldExpired {
+				switch err {
+				case domain.ErrHoldExpired:
 					code = codeHoldExpired
+				case domain.ErrHoldInvalid:
+					code = codeHoldInvalid
+				case domain.ErrEventClosed:
+					code = codeEventClosed
+				case domain.ErrEventCancelled:
+					code = codeEventCancelled
 				}
 				writeError(w, http.StatusConflict, code, err.Error())
 				return
@@ -66,10 +73,14 @@ func HandleConfirmHold(svc HoldConfirmer) http.HandlerFunc {
 			}
 		}
 
+		status := res.Order.Status
+		if status == "" {
+			status = domain.OrderStatusConfirmed
+		}
 		resp := confirmHoldResponse{
 			ID:        res.Order.ID,
 			HoldID:    res.Order.HoldID,
-			Status:    "confirmed",
+			Status:    string(status),
 			CreatedAt: res.Order.CreatedAt,
 		}
 

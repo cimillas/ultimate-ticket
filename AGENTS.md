@@ -42,15 +42,17 @@ During development we run dependencies via Docker.
 - Tidy: `cd services/api && go mod tidy`
 - Lint (if configured): `cd services/api && golangci-lint run`
 Alternative from repo root:
-- Run unit tests: `make test`
-- Run API: `make run`
+- Run tests (backend + frontend): `make test`
+- Run backend tests: `make backend-test`
+- Run frontend tests: `make frontend-test`
+- Run API: `make backend-run` (alias: `make run`)
 - Frontend install: `make frontend-install`
 - Frontend run: `make frontend-run`
-- Format: `make fmt`
-- Vet: `make vet`
-- Tidy: `make tidy`
-- Lint (if configured): `make lint`
-- Build: `make build`
+- Format: `make backend-fmt` (alias: `make fmt`)
+- Vet: `make backend-vet` (alias: `make vet`)
+- Tidy: `make backend-tidy` (alias: `make tidy`)
+- Lint (if configured): `make backend-lint` (alias: `make lint`)
+- Build: `make backend-build` (alias: `make build`)
 
 Local dependencies:
 - Postgres @ `localhost:5432` (user/password/db: `ultimate_ticket`)
@@ -63,6 +65,7 @@ API endpoints:
 - `POST /holds/{id}/confirm` expects `Idempotency-Key` header.
 - Admin (local tooling only):
   - `POST /admin/events` + `GET /admin/events`
+  - `POST /admin/events/{event_id}/cancel`
   - `POST /admin/events/{event_id}/zones` + `GET /admin/events/{event_id}/zones`
 
 If any command changes, update this file and the main README.

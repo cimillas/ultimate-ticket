@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cimillas/ultimate-ticket/services/api/internal/domain"
 	"github.com/jackc/pgx/v5"
@@ -22,36 +23,39 @@ func (r *OrderRepository) WithTx(ctx context.Context, fn func(ctx context.Contex
 	return withTx(ctx, r.pool, fn)
 }
 
-func (r *OrderRepository) GetHoldForUpdate(ctx context.Context, holdID string) (domain.Hold, error) {
+func (r *OrderRepository) GetHoldForUpdate(ctx context.Context, holdID string) (domain.Hold, time.Time, domain.EventStatus, error) {
 	const query = `
-SELECT id, event_id, zone_id, quantity, status, expires_at
-FROM holds
-WHERE id = $1
-FOR UPDATE`
+SELECT h.id, h.event_id, h.zone_id, h.quantity, h.status, h.expires_at, e.starts_at, e.status
+FROM holds h
+JOIN events e ON e.id = h.event_id
+WHERE h.id = $1
+FOR UPDATE OF h, e`
 
 	var h domain.Hold
 	var status string
+	var startsAt time.Time
+	var eventStatus string
 	err := r.queryRow(ctx, query, holdID).
-		Scan(&h.ID, &h.EventID, &h.ZoneID, &h.Quantity, &status, &h.ExpiresAt)
+		Scan(&h.ID, &h.EventID, &h.ZoneID, &h.Quantity, &status, &h.ExpiresAt, &startsAt, &eventStatus)
 	if err != nil {
 		if isInvalidUUID(err) {
-			return domain.Hold{}, domain.ErrInvalidID
+			return domain.Hold{}, time.Time{}, "", domain.ErrInvalidID
 		}
 		if err == pgx.ErrNoRows {
-			return domain.Hold{}, domain.ErrHoldNotFound
+			return domain.Hold{}, time.Time{}, "", domain.ErrHoldNotFound
 		}
-		return domain.Hold{}, fmt.Errorf("get hold: %w", err)
+		return domain.Hold{}, time.Time{}, "", fmt.Errorf("get hold: %w", err)
 	}
 	h.Status = domain.HoldStatus(status)
-	return h, nil
+	return h, startsAt, domain.EventStatus(eventStatus), nil
 }
 
 func (r *OrderRepository) GetOrderByHoldID(ctx context.Context, holdID string) (*domain.Order, error) {
-	const query = `SELECT id, hold_id, idempotency_key, created_at FROM orders WHERE hold_id = $1`
+	const query = `SELECT id, hold_id, idempotency_key, status, created_at FROM orders WHERE hold_id = $1`
 
 	var o domain.Order
 	err := r.queryRow(ctx, query, holdID).
-		Scan(&o.ID, &o.HoldID, &o.IdempotencyKey, &o.CreatedAt)
+		Scan(&o.ID, &o.HoldID, &o.IdempotencyKey, &o.Status, &o.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -62,11 +66,15 @@ func (r *OrderRepository) GetOrderByHoldID(ctx context.Context, holdID string) (
 }
 
 func (r *OrderRepository) CreateOrder(ctx context.Context, order domain.Order) error {
+	status := order.Status
+	if status == "" {
+		status = domain.OrderStatusConfirmed
+	}
 	const stmt = `
-INSERT INTO orders (id, hold_id, idempotency_key, created_at)
-VALUES ($1, $2, $3, $4)`
+INSERT INTO orders (id, hold_id, idempotency_key, status, created_at)
+VALUES ($1, $2, $3, $4, $5)`
 
-	_, err := r.exec(ctx, stmt, order.ID, order.HoldID, order.IdempotencyKey, order.CreatedAt)
+	_, err := r.exec(ctx, stmt, order.ID, order.HoldID, order.IdempotencyKey, status, order.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return domain.ErrHoldAlreadyConfirmed
@@ -85,6 +93,22 @@ func (r *OrderRepository) UpdateHoldStatus(ctx context.Context, holdID string, s
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrHoldNotFound
+	}
+	return nil
+}
+
+func (r *OrderRepository) UpdateEventStatus(ctx context.Context, eventID string, status domain.EventStatus) error {
+	const stmt = `UPDATE events SET status = $2 WHERE id = $1`
+
+	tag, err := r.exec(ctx, stmt, eventID, status)
+	if err != nil {
+		if isInvalidUUID(err) {
+			return domain.ErrInvalidID
+		}
+		return fmt.Errorf("update event status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrEventNotFound
 	}
 	return nil
 }

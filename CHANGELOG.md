@@ -6,6 +6,14 @@ This project follows Semantic Versioning (SemVer).
 
 ## [Unreleased]
 
+## [0.3.0]
+- Added event cancellation flow with refunds, cancellation timestamps, and admin endpoint.
+- Added event `closed` status that blocks new zones/holds/confirmations once the start time passes.
+- Added admin tooling to list active holds and confirmed orders per zone.
+- Expanded frontend console/admin UI with event selectors and improved inventory tooling.
+- Added frontend test suite (Vitest) and expanded backend coverage around inventory lifecycle.
+- Updated API error codes, ADRs, and domain documentation for new lifecycle states.
+
 ## [0.2.0]
 - Added admin endpoints for managing events/zones in local tooling.
 - Added CORS allow-list support via `CORS_ORIGINS`.

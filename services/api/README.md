@@ -24,12 +24,13 @@ go run ./cmd/api
 Or from repo root:
 ```bash
 make test
-make run
-make fmt
-make vet
-make tidy
-make lint
-make build
+make backend-test
+make backend-run
+make backend-fmt
+make backend-vet
+make backend-tidy
+make backend-lint
+make backend-build
 ```
 
 Configuration:
@@ -41,10 +42,11 @@ The API loads `.env` automatically when present (current dir or parent directori
 
 Endpoints:
 - `GET /health` → `ok`
-- `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}`; returns `201` with hold data or `409` on capacity/idempotency conflict.
-- `POST /holds/{id}/confirm` with header `Idempotency-Key`; returns `201` or `200` on idempotent retry.
+- `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}`; returns `201` with hold data or `409` on capacity/idempotency conflict/event closed.
+- `POST /holds/{id}/confirm` with header `Idempotency-Key`; returns `201` or `200` on idempotent retry, `409` if event is closed.
 - Admin (local tooling only):
   - `POST /admin/events` + `GET /admin/events`
+  - `POST /admin/events/{event_id}/cancel`
   - `POST /admin/events/{event_id}/zones` + `GET /admin/events/{event_id}/zones`
 
 Error format:

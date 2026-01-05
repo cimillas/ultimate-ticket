@@ -77,3 +77,65 @@ func TestConfirmHold_HTTPIntegration(t *testing.T) {
 		t.Fatalf("expected hold status confirmed, got %s", status)
 	}
 }
+
+func TestConfirmHold_EventStarted_HTTPIntegration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	testutil.ApplyMigrations(t, context.Background(), pool)
+	now := time.Date(2025, 1, 5, 9, 0, 0, 0, time.UTC)
+	repo := postgres.NewOrderRepository(pool)
+	svc := app.NewOrderService(repo, clock.NewFixed(now))
+
+	ctx := context.Background()
+	testutil.TruncateAll(t, ctx, pool)
+
+	var eventID string
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO events (name, starts_at) VALUES ($1, $2) RETURNING id`,
+		"Concert", now.Add(-1*time.Minute),
+	).Scan(&eventID); err != nil {
+		t.Fatalf("insert event: %v", err)
+	}
+
+	var zoneID string
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO zones (event_id, name, capacity) VALUES ($1, $2, $3) RETURNING id`,
+		eventID, "Zone A", 50,
+	).Scan(&zoneID); err != nil {
+		t.Fatalf("insert zone: %v", err)
+	}
+
+	holdID := testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+		Status:         domain.HoldStatusActive,
+		Quantity:       2,
+		ExpiresAt:      now.Add(10 * time.Minute),
+		IdempotencyKey: "idem-hold",
+	})
+
+	handler := HandleConfirmHold(svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/holds/"+holdID+"/confirm", nil)
+	req.Header.Set(idempotencyHeader, "idem-confirm")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected status 409, got %d", rec.Code)
+	}
+
+	var errResp apiErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if errResp.Code != codeEventClosed {
+		t.Fatalf("expected error code %s, got %s", codeEventClosed, errResp.Code)
+	}
+
+	var status string
+	if err := pool.QueryRow(ctx, `SELECT status FROM holds WHERE id = $1`, holdID).Scan(&status); err != nil {
+		t.Fatalf("query status: %v", err)
+	}
+	if status != string(domain.HoldStatusInvalid) {
+		t.Fatalf("expected hold status invalid, got %s", status)
+	}
+}

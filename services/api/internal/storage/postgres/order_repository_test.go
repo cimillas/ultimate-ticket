@@ -26,12 +26,18 @@ func TestOrderRepository(t *testing.T) {
 		})
 
 		err := repo.WithTx(ctx, func(txCtx context.Context) error {
-			hold, err := repo.GetHoldForUpdate(txCtx, holdID)
+			hold, startsAt, eventStatus, err := repo.GetHoldForUpdate(txCtx, holdID)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
 			if hold.ID != holdID || hold.EventID != eventID {
 				t.Fatalf("unexpected hold: %+v", hold)
+			}
+			if startsAt.IsZero() {
+				t.Fatalf("expected starts_at to be set")
+			}
+			if eventStatus != domain.EventStatusActive {
+				t.Fatalf("expected status active, got %s", eventStatus)
 			}
 			return nil
 		})
@@ -40,7 +46,7 @@ func TestOrderRepository(t *testing.T) {
 		}
 
 		err = repo.WithTx(ctx, func(txCtx context.Context) error {
-			_, err := repo.GetHoldForUpdate(txCtx, "00000000-0000-0000-0000-000000000001")
+			_, _, _, err := repo.GetHoldForUpdate(txCtx, "00000000-0000-0000-0000-000000000001")
 			if err != domain.ErrHoldNotFound {
 				t.Fatalf("expected ErrHoldNotFound, got %v", err)
 			}
@@ -50,7 +56,7 @@ func TestOrderRepository(t *testing.T) {
 			t.Fatalf("tx failed: %v", err)
 		}
 
-		_, err = repo.GetHoldForUpdate(ctx, "not-a-uuid")
+		_, _, _, err = repo.GetHoldForUpdate(ctx, "not-a-uuid")
 		if err != domain.ErrInvalidID {
 			t.Fatalf("expected ErrInvalidID, got %v", err)
 		}
@@ -71,6 +77,7 @@ func TestOrderRepository(t *testing.T) {
 			ID:             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			HoldID:         holdID,
 			IdempotencyKey: "idem-order",
+			Status:         domain.OrderStatusConfirmed,
 			CreatedAt:      time.Now().UTC(),
 		}
 
@@ -90,6 +97,9 @@ func TestOrderRepository(t *testing.T) {
 		}
 		if got.HoldID != order.HoldID || got.IdempotencyKey != order.IdempotencyKey {
 			t.Fatalf("unexpected order: %+v", got)
+		}
+		if got.Status != domain.OrderStatusConfirmed {
+			t.Fatalf("expected status confirmed, got %s", got.Status)
 		}
 	})
 

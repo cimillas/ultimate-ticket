@@ -16,5 +16,8 @@ var (
 	ErrHoldNotFound           = errors.New("hold not found")
 	ErrHoldExpired            = errors.New("hold expired")
 	ErrHoldAlreadyConfirmed   = errors.New("hold already confirmed")
+	ErrHoldInvalid            = errors.New("hold invalid")
+	ErrEventClosed            = errors.New("event closed")
+	ErrEventCancelled         = errors.New("event cancelled")
 	ErrInvalidID              = errors.New("invalid id")
 )

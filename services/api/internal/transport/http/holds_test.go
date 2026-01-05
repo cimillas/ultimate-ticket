@@ -77,6 +77,20 @@ func TestHandleCreateHold(t *testing.T) {
 			expectedStatus: http.StatusConflict,
 		},
 		{
+			name:           "event closed",
+			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			serviceErr:     domain.ErrEventClosed,
+			expectedStatus: http.StatusConflict,
+			expectedSubstr: `"code":"event_closed"`,
+		},
+		{
+			name:           "event cancelled",
+			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			serviceErr:     domain.ErrEventCancelled,
+			expectedStatus: http.StatusConflict,
+			expectedSubstr: `"code":"event_cancelled"`,
+		},
+		{
 			name:           "internal error",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
 			serviceErr:     errors.New("boom"),

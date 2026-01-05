@@ -85,6 +85,51 @@ func TestCreateHold_HTTPIntegration(t *testing.T) {
 	}
 }
 
+func TestCreateHold_EventStarted_HTTPIntegration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	testutil.ApplyMigrations(t, context.Background(), pool)
+	now := time.Date(2025, 1, 4, 10, 0, 0, 0, time.UTC)
+	repo := postgres.NewHoldRepository(pool)
+	svc := app.NewHoldService(repo, clock.NewFixed(now))
+
+	ctx := context.Background()
+	testutil.TruncateAll(t, ctx, pool)
+
+	var eventID string
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO events (name, starts_at) VALUES ($1, $2) RETURNING id`,
+		"Concert", now.Add(-1*time.Minute),
+	).Scan(&eventID); err != nil {
+		t.Fatalf("insert event: %v", err)
+	}
+
+	var zoneID string
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO zones (event_id, name, capacity) VALUES ($1, $2, $3) RETURNING id`,
+		eventID, "Zone A", 100,
+	).Scan(&zoneID); err != nil {
+		t.Fatalf("insert zone: %v", err)
+	}
+
+	body := []byte(`{"event_id":"` + eventID + `","zone_id":"` + zoneID + `","quantity":3,"idempotency_key":"idem-started"}`)
+	req := httptest.NewRequest(http.MethodPost, "/holds", bytes.NewBuffer(body))
+	rec := httptest.NewRecorder()
+
+	HandleCreateHold(svc).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected status 409, got %d", rec.Code)
+	}
+
+	var errResp apiErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if errResp.Code != codeEventClosed {
+		t.Fatalf("expected error code %s, got %s", codeEventClosed, errResp.Code)
+	}
+}
+
 func TestCreateAndConfirm_HTTPIntegration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 	testutil.ApplyMigrations(t, context.Background(), pool)

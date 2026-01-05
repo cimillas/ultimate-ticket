@@ -8,6 +8,7 @@ const (
 	HoldStatusActive    HoldStatus = "active"
 	HoldStatusConfirmed HoldStatus = "confirmed"
 	HoldStatusExpired   HoldStatus = "expired"
+	HoldStatusInvalid   HoldStatus = "invalid"
 )
 
 // Hold represents reserved inventory for a limited time.

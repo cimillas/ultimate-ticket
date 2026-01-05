@@ -22,6 +22,13 @@ func TestHandleConfirmHold(t *testing.T) {
 		IdempotencyKey: "idem-1",
 		CreatedAt:      now,
 	}
+	refundedOrder := domain.Order{
+		ID:             "order-2",
+		HoldID:         "hold-1",
+		IdempotencyKey: "idem-2",
+		Status:         domain.OrderStatusRefunded,
+		CreatedAt:      now,
+	}
 
 	tests := []struct {
 		name           string
@@ -48,6 +55,14 @@ func TestHandleConfirmHold(t *testing.T) {
 			expectedStatus: http.StatusOK,
 		},
 		{
+			name:           "uses order status",
+			path:           "/holds/hold-1/confirm",
+			idempotencyKey: "idem-2",
+			result:         app.ConfirmHoldResult{Order: refundedOrder, Created: false},
+			expectedStatus: http.StatusOK,
+			expectedSubstr: `"status":"refunded"`,
+		},
+		{
 			name:           "missing idempotency header",
 			path:           "/holds/hold-1/confirm",
 			expectedStatus: http.StatusBadRequest,
@@ -72,6 +87,30 @@ func TestHandleConfirmHold(t *testing.T) {
 			idempotencyKey: "idem-1",
 			serviceErr:     domain.ErrHoldExpired,
 			expectedStatus: http.StatusConflict,
+		},
+		{
+			name:           "event closed",
+			path:           "/holds/hold-1/confirm",
+			idempotencyKey: "idem-1",
+			serviceErr:     domain.ErrEventClosed,
+			expectedStatus: http.StatusConflict,
+			expectedSubstr: `"code":"event_closed"`,
+		},
+		{
+			name:           "event cancelled",
+			path:           "/holds/hold-1/confirm",
+			idempotencyKey: "idem-1",
+			serviceErr:     domain.ErrEventCancelled,
+			expectedStatus: http.StatusConflict,
+			expectedSubstr: `"code":"event_cancelled"`,
+		},
+		{
+			name:           "hold invalid",
+			path:           "/holds/hold-1/confirm",
+			idempotencyKey: "idem-1",
+			serviceErr:     domain.ErrHoldInvalid,
+			expectedStatus: http.StatusConflict,
+			expectedSubstr: `"code":"hold_invalid"`,
 		},
 		{
 			name:           "invalid path",

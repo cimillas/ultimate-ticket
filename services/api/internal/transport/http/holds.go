@@ -71,6 +71,12 @@ func HandleCreateHold(svc HoldCreator) http.HandlerFunc {
 			case domain.ErrInsufficientCapacity:
 				writeError(w, http.StatusConflict, codeInsufficientCapacity, err.Error())
 				return
+			case domain.ErrEventClosed:
+				writeError(w, http.StatusConflict, codeEventClosed, err.Error())
+				return
+			case domain.ErrEventCancelled:
+				writeError(w, http.StatusConflict, codeEventCancelled, err.Error())
+				return
 			default:
 				writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
 				return

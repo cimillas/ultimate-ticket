@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -21,16 +22,22 @@ func TestHoldRepository(t *testing.T) {
 		eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
 
 		err := repo.WithTx(ctx, func(txCtx context.Context) error {
-			zone, err := repo.GetZoneForUpdate(txCtx, eventID, zoneID)
+			zone, startsAt, status, err := repo.GetZoneForUpdate(txCtx, eventID, zoneID)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
 			if zone.ID != zoneID || zone.EventID != eventID || zone.Capacity != 100 {
 				t.Fatalf("unexpected zone: %+v", zone)
 			}
+			if startsAt.IsZero() {
+				t.Fatalf("expected starts_at to be set")
+			}
+			if status != domain.EventStatusActive {
+				t.Fatalf("expected status active, got %s", status)
+			}
 
 			missingZoneID := "00000000-0000-0000-0000-000000000001"
-			_, err = repo.GetZoneForUpdate(txCtx, eventID, missingZoneID)
+			_, _, _, err = repo.GetZoneForUpdate(txCtx, eventID, missingZoneID)
 			if err != domain.ErrZoneNotFound {
 				t.Fatalf("expected ErrZoneNotFound, got %v", err)
 			}
@@ -41,9 +48,42 @@ func TestHoldRepository(t *testing.T) {
 			t.Fatalf("tx failed: %v", err)
 		}
 
-		_, err = repo.GetZoneForUpdate(ctx, eventID, "not-a-uuid")
+		_, _, _, err = repo.GetZoneForUpdate(ctx, eventID, "not-a-uuid")
 		if err != domain.ErrInvalidID {
 			t.Fatalf("expected ErrInvalidID, got %v", err)
+		}
+	})
+
+	t.Run("GetZoneForUpdate waits on event lock", func(t *testing.T) {
+		ctx := context.Background()
+		testutil.TruncateAll(t, ctx, pool)
+
+		eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatalf("begin tx: %v", err)
+		}
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		if _, err := tx.Exec(ctx, `SELECT id FROM events WHERE id = $1 FOR UPDATE`, eventID); err != nil {
+			t.Fatalf("lock event: %v", err)
+		}
+
+		lockCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+		defer cancel()
+
+		err = repo.WithTx(lockCtx, func(txCtx context.Context) error {
+			_, _, _, err := repo.GetZoneForUpdate(txCtx, eventID, zoneID)
+			return err
+		})
+		if err == nil {
+			t.Fatalf("expected GetZoneForUpdate to block on event lock")
+		}
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected deadline exceeded, got %v", err)
 		}
 	})
 

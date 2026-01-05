@@ -10,11 +10,12 @@ import (
 
 type HoldRepository interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
-	GetZoneForUpdate(ctx context.Context, eventID, zoneID string) (domain.Zone, error)
+	GetZoneForUpdate(ctx context.Context, eventID, zoneID string) (domain.Zone, time.Time, domain.EventStatus, error)
 	FindHoldByIdempotencyKey(ctx context.Context, eventID, zoneID, key string) (*domain.Hold, error)
 	SumActiveHolds(ctx context.Context, eventID, zoneID string, now time.Time) (int, error)
 	SumConfirmed(ctx context.Context, eventID, zoneID string) (int, error)
 	CreateHold(ctx context.Context, hold domain.Hold) error
+	UpdateEventStatus(ctx context.Context, eventID string, status domain.EventStatus) error
 }
 
 type HoldService struct {
@@ -65,6 +66,7 @@ func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domai
 
 	now := s.clock.Now()
 	var result domain.Hold
+	var eventErr error
 
 	err := s.repo.WithTx(ctx, func(txCtx context.Context) error {
 		if existing, err := s.repo.FindHoldByIdempotencyKey(txCtx, in.EventID, in.ZoneID, in.IdempotencyKey); err != nil {
@@ -77,9 +79,26 @@ func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domai
 			return nil
 		}
 
-		zone, err := s.repo.GetZoneForUpdate(txCtx, in.EventID, in.ZoneID)
+		zone, startsAt, eventStatus, err := s.repo.GetZoneForUpdate(txCtx, in.EventID, in.ZoneID)
 		if err != nil {
 			return err
+		}
+		if eventStatus == domain.EventStatusCancelled {
+			eventErr = domain.ErrEventCancelled
+			return nil
+		}
+		if eventStatus == domain.EventStatusClosed {
+			eventErr = domain.ErrEventClosed
+			return nil
+		}
+		if !startsAt.After(now) {
+			if eventStatus == "" || eventStatus == domain.EventStatusActive {
+				if err := s.repo.UpdateEventStatus(txCtx, in.EventID, domain.EventStatusClosed); err != nil {
+					return err
+				}
+			}
+			eventErr = domain.ErrEventClosed
+			return nil
 		}
 
 		activeQty, err := s.repo.SumActiveHolds(txCtx, in.EventID, in.ZoneID, now)
@@ -130,6 +149,9 @@ func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domai
 	})
 	if err != nil {
 		return domain.Hold{}, err
+	}
+	if eventErr != nil {
+		return domain.Hold{}, eventErr
 	}
 
 	return result, nil

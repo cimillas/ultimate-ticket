@@ -6,10 +6,10 @@ High-scale ticketing prototype focused on:
 - Eventually: waiting room, payments, anti-bot, SRE hardening
 
 ## Domain concepts (short)
-- Event: the ticketed experience (concert/show), groups zones.
-- Zone: a sellable area within an event, with a fixed capacity.
-- Hold: temporary reservation of tickets in a zone (has TTL).
-- Confirmation (order): finalizes a hold into a purchase.
+- Event: the ticketed experience (concert/show), groups zones, and can be complete when all zones are sold out.
+- Zone: a sellable area within an event, with a fixed capacity and derived availability.
+- Hold: temporary reservation of tickets in a zone (has TTL); blocked once an event is closed after start.
+- Confirmation (order): finalizes a hold into a purchase; rejected once the event is closed.
 
 Full reference: `docs/concepts.md`
 
@@ -34,11 +34,14 @@ API (default config)
   - `CORS_ORIGINS` (comma-separated, e.g. `http://localhost:5173`)
 - Endpoints:
   - `GET /health` → `ok`
-  - `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}` (409 on capacity or idempotency conflict)
-  - `POST /holds/{id}/confirm` with header `Idempotency-Key` (201 created, 200 idempotent retry)
+  - `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}` (409 on capacity, idempotency conflict, or event closed)
+  - `POST /holds/{id}/confirm` with header `Idempotency-Key` (201 created, 200 idempotent retry, 409 after event closed)
   - Admin (local tooling only):
     - `POST /admin/events` + `GET /admin/events`
+    - `POST /admin/events/{event_id}/cancel`
     - `POST /admin/events/{event_id}/zones` + `GET /admin/events/{event_id}/zones`
+    - `GET /admin/events/{event_id}/zones/{zone_id}/holds`
+    - `GET /admin/events/{event_id}/zones/{zone_id}/orders`
 
 Migrations:
 - Applied on startup and recorded in `schema_migrations`.
@@ -96,6 +99,7 @@ Expected response (200):
 ```json
 {"id":"<order_id>","hold_id":"<hold_id>","status":"confirmed","created_at":"<created_at>"}
 ```
+Note: `status` can be `confirmed` or `refunded` if the event was cancelled after confirmation.
 
 Error format:
 ```json
@@ -115,7 +119,7 @@ cp .env.example .env
 
 Run backend (from repo root; `.env` is auto-loaded if present):
 ```bash
-make run
+make backend-run
 ```
 
 Run frontend:
@@ -124,18 +128,31 @@ make frontend-install
 make frontend-run
 ```
 
+Frontend tests:
+```bash
+make frontend-test
+```
+
+Frontend pages:
+- Console: `http://localhost:5173/`
+- Admin (no auth yet): `http://localhost:5173/admin/`
+Idempotency keys are auto-generated in the UI and can be edited or regenerated for debugging.
+
 Frontend env variables (from `.env`):
 - `VITE_API_BASE_URL` (e.g. `http://localhost:8080`)
 - `FRONTEND_PORT` (default: `5173`)
 ## Common commands (from repo root)
+`make test` runs backend + frontend; use the scoped targets below if needed.
 ```bash
 make test
-make run
-make fmt
-make vet
-make tidy
-make lint
-make build
+make backend-test
+make frontend-test
+make backend-run
+make backend-fmt
+make backend-vet
+make backend-tidy
+make backend-lint
+make backend-build
 ```
 
 ## Repository layout (initial)

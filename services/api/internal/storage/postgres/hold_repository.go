@@ -23,20 +23,27 @@ func (r *HoldRepository) WithTx(ctx context.Context, fn func(ctx context.Context
 	return withTx(ctx, r.pool, fn)
 }
 
-func (r *HoldRepository) GetZoneForUpdate(ctx context.Context, eventID, zoneID string) (domain.Zone, error) {
-	const query = `SELECT id, event_id, name, capacity FROM zones WHERE id = $1 AND event_id = $2 FOR UPDATE`
+func (r *HoldRepository) GetZoneForUpdate(ctx context.Context, eventID, zoneID string) (domain.Zone, time.Time, domain.EventStatus, error) {
+	const query = `
+SELECT z.id, z.event_id, z.name, z.capacity, e.starts_at, e.status
+FROM zones z
+JOIN events e ON e.id = z.event_id
+WHERE z.id = $1 AND z.event_id = $2
+FOR UPDATE OF z, e`
 	var z domain.Zone
-	err := r.queryRow(ctx, query, zoneID, eventID).Scan(&z.ID, &z.EventID, &z.Name, &z.Capacity)
+	var startsAt time.Time
+	var status string
+	err := r.queryRow(ctx, query, zoneID, eventID).Scan(&z.ID, &z.EventID, &z.Name, &z.Capacity, &startsAt, &status)
 	if err != nil {
 		if isInvalidUUID(err) {
-			return domain.Zone{}, domain.ErrInvalidID
+			return domain.Zone{}, time.Time{}, "", domain.ErrInvalidID
 		}
 		if err == pgx.ErrNoRows {
-			return domain.Zone{}, domain.ErrZoneNotFound
+			return domain.Zone{}, time.Time{}, "", domain.ErrZoneNotFound
 		}
-		return domain.Zone{}, fmt.Errorf("get zone: %w", err)
+		return domain.Zone{}, time.Time{}, "", fmt.Errorf("get zone: %w", err)
 	}
-	return z, nil
+	return z, startsAt, domain.EventStatus(status), nil
 }
 
 func (r *HoldRepository) FindHoldByIdempotencyKey(ctx context.Context, eventID, zoneID, key string) (*domain.Hold, error) {
@@ -115,6 +122,22 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 			return domain.ErrInvalidID
 		}
 		return fmt.Errorf("create hold: %w", err)
+	}
+	return nil
+}
+
+func (r *HoldRepository) UpdateEventStatus(ctx context.Context, eventID string, status domain.EventStatus) error {
+	const stmt = `UPDATE events SET status = $2 WHERE id = $1`
+
+	tag, err := r.exec(ctx, stmt, eventID, status)
+	if err != nil {
+		if isInvalidUUID(err) {
+			return domain.ErrInvalidID
+		}
+		return fmt.Errorf("update event status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrEventNotFound
 	}
 	return nil
 }

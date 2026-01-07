@@ -42,7 +42,7 @@ func (f *fakeAdminRepo) CreateEvent(ctx context.Context, event domain.Event) err
 	return f.createEventErr
 }
 
-func (f *fakeAdminRepo) ListEvents(ctx context.Context) ([]domain.Event, error) {
+func (f *fakeAdminRepo) ListEvents(ctx context.Context, _ time.Time) ([]domain.Event, error) {
 	if f.listEventsErr != nil {
 		return nil, f.listEventsErr
 	}
@@ -188,21 +188,12 @@ func TestAdminService_CreateZone_ClosesEventWhenStarted(t *testing.T) {
 	}
 }
 
-func TestAdminService_ListEvents_CompletesWhenAllZonesUnavailable(t *testing.T) {
+func TestAdminService_ListEvents_PreservesCompleteness(t *testing.T) {
 	repo := &fakeAdminRepo{
 		events: []domain.Event{
-			{ID: "event-1", Name: "Concert", StartsAt: time.Now()},
-			{ID: "event-2", Name: "Festival", StartsAt: time.Now()},
-			{ID: "event-3", Name: "No Zones", StartsAt: time.Now()},
-		},
-		zonesByEvent: map[string][]domain.Zone{
-			"event-1": {
-				{ID: "zone-1", EventID: "event-1", Capacity: 10, Available: 0},
-				{ID: "zone-2", EventID: "event-1", Capacity: 5, Available: 0},
-			},
-			"event-2": {
-				{ID: "zone-3", EventID: "event-2", Capacity: 10, Available: 3},
-			},
+			{ID: "event-1", Name: "Concert", StartsAt: time.Now(), IsComplete: true},
+			{ID: "event-2", Name: "Festival", StartsAt: time.Now(), IsComplete: false},
+			{ID: "event-3", Name: "No Zones", StartsAt: time.Now(), IsComplete: false},
 		},
 	}
 
@@ -217,14 +208,8 @@ func TestAdminService_ListEvents_CompletesWhenAllZonesUnavailable(t *testing.T) 
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
 
-	if !events[0].IsComplete {
-		t.Fatalf("expected event-1 to be complete")
-	}
-	if events[1].IsComplete {
-		t.Fatalf("expected event-2 to be incomplete")
-	}
-	if events[2].IsComplete {
-		t.Fatalf("expected event-3 to be incomplete with no zones")
+	if !events[0].IsComplete || events[1].IsComplete || events[2].IsComplete {
+		t.Fatalf("unexpected completeness flags: %+v", events)
 	}
 }
 

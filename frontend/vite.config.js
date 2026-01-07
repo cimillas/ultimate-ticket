@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => {
         input: {
           main: resolve(rootDir, 'index.html'),
           admin: resolve(rootDir, 'admin/index.html'),
+          login: resolve(rootDir, 'login/index.html'),
+          register: resolve(rootDir, 'register/index.html'),
         },
       },
     },

@@ -15,6 +15,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: "Source Sans 3", sans-serif;
@@ -76,6 +80,14 @@ header {
   gap: 12px;
 }
 
+.header-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .nav {
   display: flex;
   gap: 12px;
@@ -133,6 +145,40 @@ label {
   display: grid;
   gap: 6px;
   font-size: 14px;
+}
+
+.auth-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.auth-status button {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.auth-status[hidden] {
+  display: none;
+}
+
+.inline-link {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  justify-self: start;
+}
+
+.inline-link:hover {
+  text-decoration: underline;
+}
+
+.auth-status strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .inline-field {
@@ -267,6 +313,11 @@ pre {
   header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .header-meta {
+    align-items: flex-start;
+    justify-content: flex-start;
   }
 
   .layout {

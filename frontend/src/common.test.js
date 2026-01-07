@@ -4,6 +4,9 @@ import {
   fetchEvents,
   fetchJSON,
   fetchZones,
+  refreshAuthStatus,
+  renderAuthStatus,
+  request,
   setOutput,
   setupEventPicker,
   setupZonePicker,
@@ -284,6 +287,36 @@ describe('fetchZones', () => {
   });
 });
 
+describe('auth status', () => {
+  it('renders signed-in and signed-out states', () => {
+    const container = document.createElement('div');
+    container.className = 'auth-status';
+    const el = document.createElement('strong');
+    container.appendChild(el);
+    renderAuthStatus(el, { username: 'ana', role: 'admin' });
+    expect(el.textContent).toBe('ana (admin)');
+    expect(container.hidden).toBe(false);
+
+    renderAuthStatus(el, null);
+    expect(el.textContent).toBe('');
+    expect(container.hidden).toBe(true);
+  });
+
+  it('refreshes auth status from /me', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        status: 200,
+        text: async () => JSON.stringify({ user: { username: 'ana', role: 'user' } }),
+      })),
+    );
+
+    const el = document.createElement('strong');
+    await refreshAuthStatus(el);
+    expect(el.textContent).toBe('ana (user)');
+  });
+});
+
 describe('fetchEvents', () => {
   it('filters to active events', async () => {
     vi.stubGlobal(
@@ -302,5 +335,19 @@ describe('fetchEvents', () => {
     const res = await fetchEvents(output);
     expect(res?.length).toBe(1);
     expect(res?.[0].id).toBe('event-1');
+  });
+});
+
+describe('request', () => {
+  it('reports network errors in the output', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('network down');
+    }));
+
+    const output = document.createElement('pre');
+    const res = await request(output, '/events');
+    expect(res.status).toBe(0);
+    const parsed = JSON.parse(output.textContent);
+    expect(parsed.body.error).toBe('network_error');
   });
 });

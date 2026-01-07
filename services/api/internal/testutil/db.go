@@ -60,7 +60,7 @@ func ApplyMigrations(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 
 func TruncateAll(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	_, err := pool.Exec(ctx, `TRUNCATE orders, holds, zones, events RESTART IDENTITY CASCADE`)
+	_, err := pool.Exec(ctx, `TRUNCATE sessions, users, orders, holds, zones, events RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatalf("truncate: %v", err)
 	}

@@ -17,10 +17,18 @@
           <h1>Ultimate Ticket Console</h1>
           <p>Local tools for events, zones, holds, and confirms.</p>
         </div>
-        <nav class="nav">
-          <a href="/" aria-current="page">Console</a>
-          <a href="/admin/">Admin</a>
-        </nav>
+        <div class="header-meta">
+          <nav class="nav">
+            <a href="/" aria-current="page">Console</a>
+            <a href="/admin/" id="admin-link" hidden>Admin</a>
+            <a href="/login/" id="login-link">Login</a>
+          </nav>
+          <div class="auth-status" hidden>
+            <span>Signed in:</span>
+            <strong id="auth-status"></strong>
+            <button class="button-secondary" type="button" id="logout-button">Logout</button>
+          </div>
+        </div>
       </header>
 
       <div class="layout">
@@ -34,7 +42,7 @@
 
           <section class="input-section">
             <h2>List zones</h2>
-            <form id="list-zones">
+            <form id="list-zones" autocomplete="off">
               <label>
                 Event (select or paste ID)
                 <div class="event-picker" data-event-picker>
@@ -46,9 +54,9 @@
             </form>
           </section>
 
-          <section class="input-section">
+          <section class="input-section" data-auth-only hidden>
             <h2>Holds</h2>
-            <form id="create-hold">
+            <form id="create-hold" autocomplete="off">
               <label>
                 Event (select or paste ID)
                 <div class="event-picker" data-event-picker>
@@ -80,9 +88,9 @@
             </form>
           </section>
 
-          <section class="input-section">
+          <section class="input-section" data-auth-only hidden>
             <h2>Confirm hold</h2>
-            <form id="confirm-hold">
+            <form id="confirm-hold" autocomplete="off">
               <label>
                 Hold ID
                 <input name="hold_id" required />

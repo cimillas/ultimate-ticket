@@ -1,4 +1,4 @@
-.PHONY: help test backend-test backend-run backend-fmt backend-vet backend-tidy backend-lint backend-build run fmt vet tidy lint build frontend-install frontend-run frontend-build frontend-preview frontend-test
+.PHONY: help test backend-test backend-run backend-fmt backend-vet backend-tidy backend-lint backend-build backend-auth-bootstrap backend-auth-reset run fmt vet tidy lint build frontend-install frontend-run frontend-build frontend-preview frontend-test
 
 API_DIR := services/api
 GO := go
@@ -14,6 +14,8 @@ help:
 	@printf "  backend-tidy   - tidy Go modules\n"
 	@printf "  backend-lint   - run golangci-lint if installed\n"
 	@printf "  backend-build  - build the API binary\n"
+	@printf "  backend-auth-bootstrap - create admin user from env vars\n"
+	@printf "  backend-auth-reset     - reset auth tables and create admin (APP_ENV=local, CONFIRM=YES)\n"
 	@printf "  frontend-test  - run frontend tests\n"
 	@printf "  frontend-install - install frontend deps\n"
 	@printf "  frontend-run     - run the frontend dev server\n"
@@ -51,6 +53,12 @@ backend-lint:
 
 backend-build:
 	@cd $(API_DIR) && $(GO) build ./cmd/api
+
+backend-auth-bootstrap:
+	@cd $(API_DIR) && $(GO) run ./cmd/authctl bootstrap-admin
+
+backend-auth-reset:
+	@cd $(API_DIR) && $(GO) run ./cmd/authctl reset-auth
 
 run: backend-run
 fmt: backend-fmt

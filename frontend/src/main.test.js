@@ -4,6 +4,7 @@ const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const setupDOM = () => {
   document.body.innerHTML = `
+    <div id="auth-status"></div>
     <button id="list-events">List events</button>
     <form id="list-zones">
       <div data-event-picker>
@@ -51,6 +52,13 @@ const loadMain = async () => {
 beforeEach(() => {
   vi.resetModules();
   localStorage.clear();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      status: 401,
+      text: async () => JSON.stringify({ error: 'unauthorized' }),
+    })),
+  );
   setupDOM();
 });
 
@@ -114,7 +122,8 @@ describe('main.js', () => {
     holdForm.dispatchEvent(new Event('submit'));
     await flushPromises();
 
-    const [url, options] = fetchSpy.mock.calls[0];
+    const holdCall = fetchSpy.mock.calls.find((call) => call[0].endsWith('/holds'));
+    const [url, options] = holdCall;
     expect(url).toBe('http://localhost:8080/holds');
     expect(options.method).toBe('POST');
     const payload = JSON.parse(options.body);
@@ -147,7 +156,8 @@ describe('main.js', () => {
     confirmForm.dispatchEvent(new Event('submit'));
     await flushPromises();
 
-    const [url, options] = fetchSpy.mock.calls[0];
+    const confirmCall = fetchSpy.mock.calls.find((call) => call[0].includes('/holds/hold-9/confirm'));
+    const [url, options] = confirmCall;
     expect(url).toBe('http://localhost:8080/holds/hold-9/confirm');
     expect(options.method).toBe('POST');
     expect(options.headers['Idempotency-Key']).toBe('confirm-key');

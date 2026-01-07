@@ -11,7 +11,7 @@ import (
 type AdminRepository interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
 	CreateEvent(ctx context.Context, event domain.Event) error
-	ListEvents(ctx context.Context) ([]domain.Event, error)
+	ListEvents(ctx context.Context, now time.Time) ([]domain.Event, error)
 	CancelEvent(ctx context.Context, eventID string, now time.Time) (domain.Event, error)
 	GetEventForUpdate(ctx context.Context, eventID string) (domain.Event, error)
 	UpdateEventStatus(ctx context.Context, eventID string, status domain.EventStatus) error
@@ -61,32 +61,14 @@ func (s *AdminService) CreateEvent(ctx context.Context, in CreateEventInput) (do
 }
 
 func (s *AdminService) ListEvents(ctx context.Context) ([]domain.Event, error) {
-	events, err := s.repo.ListEvents(ctx)
+	events, err := s.repo.ListEvents(ctx, s.clock.Now())
 	if err != nil {
 		return nil, err
 	}
-
-	now := s.clock.Now()
 	for i := range events {
 		if events[i].Status == "" {
 			events[i].Status = domain.EventStatusActive
 		}
-		zones, err := s.repo.ListZonesByEvent(ctx, events[i].ID, now)
-		if err != nil {
-			return nil, err
-		}
-		if len(zones) == 0 {
-			events[i].IsComplete = false
-			continue
-		}
-		complete := true
-		for _, zone := range zones {
-			if zone.Available > 0 {
-				complete = false
-				break
-			}
-		}
-		events[i].IsComplete = complete
 	}
 
 	return events, nil

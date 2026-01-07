@@ -6,6 +6,16 @@ This project follows Semantic Versioning (SemVer).
 
 ## [Unreleased]
 
+## [0.4.0]
+- Added session-based auth with user registration, login/logout, and admin role enforcement.
+- Added public event/zone listing endpoints and protected holds/confirmations.
+- Updated frontend to include login/register UI and cookie-based requests.
+- Removed automatic admin creation; added `authctl` for bootstrap/reset with local-only guard.
+- Session cookie secure flag now defaults to true outside `APP_ENV=local`.
+- Disallowed `@` in usernames and removed login identifier ambiguity.
+- Added `ALLOW_PUBLIC_REGISTER` flag to disable public registration outside local.
+- Added request ID middleware and JSON request logs (status, latency, bytes, IP, agent).
+
 ## [0.3.0]
 - Added event cancellation flow with refunds, cancellation timestamps, and admin endpoint.
 - Added event `closed` status that blocks new zones/holds/confirmations once the start time passes.

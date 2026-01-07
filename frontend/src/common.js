@@ -12,7 +12,7 @@ export function setOutput(output, status, body) {
 }
 
 export async function fetchJSON(path, options = {}) {
-  const res = await fetch(`${apiBase}${path}`, options);
+  const res = await fetch(`${apiBase}${path}`, { credentials: 'include', ...options });
   const text = await res.text();
   let body = text;
   try {
@@ -23,11 +23,48 @@ export async function fetchJSON(path, options = {}) {
   return { status: res.status, body };
 }
 
+export function renderAuthStatus(statusEl, user) {
+  if (!statusEl) {
+    return;
+  }
+  const container = statusEl.closest('.auth-status');
+  if (!user) {
+    statusEl.textContent = '';
+    if (container) {
+      container.hidden = true;
+    }
+    return;
+  }
+  const role = user.role ? ` (${user.role})` : '';
+  statusEl.textContent = `${user.username}${role}`;
+  if (container) {
+    container.hidden = false;
+  }
+}
+
+export function toggleLoginLink(user) {
+  const link = document.getElementById('login-link');
+  if (!link) {
+    return;
+  }
+  link.hidden = Boolean(user);
+}
+
+export async function refreshAuthStatus(statusEl) {
+  const res = await fetchJSON('/me');
+  if (res.status >= 200 && res.status < 300 && res.body?.user) {
+    renderAuthStatus(statusEl, res.body.user);
+    return { ...res, user: res.body.user };
+  }
+  renderAuthStatus(statusEl, null);
+  return { ...res, user: null };
+}
+
 export async function fetchZones(output, eventID) {
   if (!eventID) {
     return null;
   }
-  const res = await fetchJSON(`/admin/events/${eventID}/zones`);
+  const res = await fetchJSON(`/events/${eventID}/zones`);
   if (res.status >= 200 && res.status < 300 && Array.isArray(res.body)) {
     return res.body;
   }
@@ -36,7 +73,7 @@ export async function fetchZones(output, eventID) {
 }
 
 export async function fetchEvents(output) {
-  const res = await fetchJSON('/admin/events');
+  const res = await fetchJSON('/events');
   if (res.status >= 200 && res.status < 300 && Array.isArray(res.body)) {
     return res.body.filter((event) => !event?.status || event.status === 'active');
   }
@@ -283,8 +320,14 @@ export function setupZonePicker(output, form) {
 }
 
 export async function request(output, path, options = {}) {
-  const res = await fetchJSON(path, options);
-  const { status, body } = res;
-  setOutput(output, status, body);
-  return { status, body };
+  try {
+    const res = await fetchJSON(path, options);
+    const { status, body } = res;
+    setOutput(output, status, body);
+    return { status, body };
+  } catch (err) {
+    const body = { error: 'network_error', detail: String(err) };
+    setOutput(output, 0, body);
+    return { status: 0, body };
+  }
 }

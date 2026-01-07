@@ -17,10 +17,18 @@
           <h1>Ultimate Ticket Console</h1>
           <p>Admin tools for events and zones.</p>
         </div>
-        <nav class="nav">
-          <a href="/">Console</a>
-          <a href="/admin/" aria-current="page">Admin</a>
-        </nav>
+        <div class="header-meta">
+          <nav class="nav">
+            <a href="/">Console</a>
+            <a href="/admin/" id="admin-link" aria-current="page" hidden>Admin</a>
+            <a href="/login/" id="login-link">Login</a>
+          </nav>
+          <div class="auth-status" hidden>
+            <span>Signed in:</span>
+            <strong id="auth-status"></strong>
+            <button class="button-secondary" type="button" id="logout-button">Logout</button>
+          </div>
+        </div>
       </header>
 
       <div class="layout">
@@ -29,7 +37,7 @@
             <div class="group-title">Events</div>
             <section class="input-section">
               <h2>Create event</h2>
-              <form id="create-event">
+              <form id="create-event" autocomplete="off">
                 <label>
                   Name
                   <input name="name" required />
@@ -51,7 +59,7 @@
 
             <section class="input-section">
               <h2>Cancel event</h2>
-              <form id="cancel-event">
+              <form id="cancel-event" autocomplete="off">
                 <label>
                   Event (select or paste ID)
                   <div class="event-picker" data-event-picker>
@@ -68,7 +76,7 @@
             <div class="group-title">Zones</div>
             <section class="input-section">
               <h2>Create zone</h2>
-              <form id="create-zone">
+              <form id="create-zone" autocomplete="off">
                 <label>
                   Event (select or paste ID)
                   <div class="event-picker" data-event-picker>
@@ -90,7 +98,7 @@
 
             <section class="input-section">
               <h2>List zones</h2>
-              <form id="list-zones">
+              <form id="list-zones" autocomplete="off">
                 <label>
                   Event (select or paste ID)
                   <div class="event-picker" data-event-picker>
@@ -104,7 +112,7 @@
 
             <section class="input-section">
               <h2>List active holds</h2>
-              <form id="list-active-holds">
+              <form id="list-active-holds" autocomplete="off">
                 <label>
                   Event (select or paste ID)
                   <div class="event-picker" data-event-picker>
@@ -125,7 +133,7 @@
 
             <section class="input-section">
               <h2>List confirmed orders</h2>
-              <form id="list-confirmed-orders">
+              <form id="list-confirmed-orders" autocomplete="off">
                 <label>
                   Event (select or paste ID)
                   <div class="event-picker" data-event-picker>

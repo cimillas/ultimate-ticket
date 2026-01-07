@@ -26,7 +26,7 @@ func TestAdminRepository_CreateAndListEvents(t *testing.T) {
 		t.Fatalf("create event: %v", err)
 	}
 
-	events, err := repo.ListEvents(ctx)
+	events, err := repo.ListEvents(ctx, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("list events: %v", err)
 	}
@@ -35,6 +35,105 @@ func TestAdminRepository_CreateAndListEvents(t *testing.T) {
 	}
 	if events[0].ID != event.ID || events[0].Name != event.Name {
 		t.Fatalf("unexpected event: %+v", events[0])
+	}
+}
+
+func TestAdminRepository_ListEvents_Completeness(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	testutil.ApplyMigrations(t, context.Background(), pool)
+	repo := NewAdminRepository(pool)
+
+	ctx := context.Background()
+	testutil.TruncateAll(t, ctx, pool)
+
+	now := time.Date(2025, 1, 5, 10, 0, 0, 0, time.UTC)
+
+	eventFull := domain.Event{
+		ID:       "00000000-0000-0000-0000-000000000101",
+		Name:     "Full",
+		StartsAt: now,
+	}
+	eventOpen := domain.Event{
+		ID:       "00000000-0000-0000-0000-000000000102",
+		Name:     "Open",
+		StartsAt: now,
+	}
+	eventNoZones := domain.Event{
+		ID:       "00000000-0000-0000-0000-000000000103",
+		Name:     "No Zones",
+		StartsAt: now,
+	}
+	if err := repo.CreateEvent(ctx, eventFull); err != nil {
+		t.Fatalf("create event full: %v", err)
+	}
+	if err := repo.CreateEvent(ctx, eventOpen); err != nil {
+		t.Fatalf("create event open: %v", err)
+	}
+	if err := repo.CreateEvent(ctx, eventNoZones); err != nil {
+		t.Fatalf("create event no zones: %v", err)
+	}
+
+	if err := repo.CreateZone(ctx, domain.Zone{
+		ID:       "00000000-0000-0000-0000-000000000201",
+		EventID:  eventFull.ID,
+		Name:     "Zone A",
+		Capacity: 10,
+	}); err != nil {
+		t.Fatalf("create zone A: %v", err)
+	}
+	if err := repo.CreateZone(ctx, domain.Zone{
+		ID:       "00000000-0000-0000-0000-000000000202",
+		EventID:  eventFull.ID,
+		Name:     "Zone B",
+		Capacity: 5,
+	}); err != nil {
+		t.Fatalf("create zone B: %v", err)
+	}
+	if err := repo.CreateZone(ctx, domain.Zone{
+		ID:       "00000000-0000-0000-0000-000000000203",
+		EventID:  eventOpen.ID,
+		Name:     "Zone C",
+		Capacity: 10,
+	}); err != nil {
+		t.Fatalf("create zone C: %v", err)
+	}
+
+	testutil.InsertHold(t, ctx, pool, eventFull.ID, "00000000-0000-0000-0000-000000000201", domain.Hold{
+		Status:         domain.HoldStatusConfirmed,
+		Quantity:       10,
+		ExpiresAt:      now.Add(10 * time.Minute),
+		IdempotencyKey: "full-1",
+	})
+	testutil.InsertHold(t, ctx, pool, eventFull.ID, "00000000-0000-0000-0000-000000000202", domain.Hold{
+		Status:         domain.HoldStatusActive,
+		Quantity:       5,
+		ExpiresAt:      now.Add(10 * time.Minute),
+		IdempotencyKey: "full-2",
+	})
+	testutil.InsertHold(t, ctx, pool, eventOpen.ID, "00000000-0000-0000-0000-000000000203", domain.Hold{
+		Status:         domain.HoldStatusActive,
+		Quantity:       3,
+		ExpiresAt:      now.Add(10 * time.Minute),
+		IdempotencyKey: "open-1",
+	})
+
+	events, err := repo.ListEvents(ctx, now)
+	if err != nil {
+		t.Fatalf("list events: %v", err)
+	}
+	got := make(map[string]domain.Event, len(events))
+	for _, event := range events {
+		got[event.ID] = event
+	}
+
+	if !got[eventFull.ID].IsComplete {
+		t.Fatalf("expected full event to be complete")
+	}
+	if got[eventOpen.ID].IsComplete {
+		t.Fatalf("expected open event to be incomplete")
+	}
+	if got[eventNoZones.ID].IsComplete {
+		t.Fatalf("expected no-zones event to be incomplete")
 	}
 }
 

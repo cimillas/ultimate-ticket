@@ -1,7 +1,18 @@
-import { request, setOutput, setupEventPicker, setupZonePicker } from './common.js';
+import {
+  refreshAuthStatus,
+  request,
+  setOutput,
+  setupEventPicker,
+  setupZonePicker,
+  toggleLoginLink,
+} from './common.js';
 
 const output = document.getElementById('output');
 const requestWithOutput = (path, options) => request(output, path, options);
+const authStatus = document.getElementById('auth-status');
+const adminLink = document.getElementById('admin-link');
+const adminStack = document.querySelector('.stack');
+const logoutButton = document.getElementById('logout-button');
 
 const cancelEventForm = document.getElementById('cancel-event');
 const createZoneForm = document.getElementById('create-zone');
@@ -91,3 +102,32 @@ setupEventPicker(output, listActiveHoldsForm);
 setupEventPicker(output, listConfirmedOrdersForm);
 setupZonePicker(output, listActiveHoldsForm);
 setupZonePicker(output, listConfirmedOrdersForm);
+
+const updateAdminUI = (user) => {
+  const isAdmin = user?.role === 'admin';
+  if (adminLink) {
+    adminLink.hidden = !isAdmin;
+  }
+  toggleLoginLink(user);
+  if (adminStack) {
+    adminStack.hidden = !isAdmin;
+  }
+};
+
+if (adminStack) {
+  adminStack.hidden = true;
+}
+
+refreshAuthStatus(authStatus).then(({ user }) => {
+  updateAdminUI(user);
+});
+
+if (logoutButton) {
+  logoutButton.addEventListener('click', async () => {
+    const res = await requestWithOutput('/auth/logout', { method: 'POST' });
+    if (res?.status >= 200 && res.status < 300) {
+      const auth = await refreshAuthStatus(authStatus);
+      updateAdminUI(auth.user);
+    }
+  });
+}

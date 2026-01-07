@@ -4,6 +4,7 @@ const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const setupDOM = () => {
   document.body.innerHTML = `
+    <div id="auth-status"></div>
     <button id="list-events">List events</button>
     <form id="cancel-event">
       <div data-event-picker>
@@ -90,7 +91,8 @@ describe('admin.js', () => {
     form.dispatchEvent(new Event('submit'));
     await flushPromises();
 
-    expect(fetchSpy).not.toHaveBeenCalled();
+    const adminCall = fetchSpy.mock.calls.find((call) => call[0].includes('/admin/events'));
+    expect(adminCall).toBeUndefined();
     const output = document.getElementById('output');
     const parsed = JSON.parse(output.textContent);
     expect(parsed.body).toEqual({ error: 'invalid starts_at', code: 'invalid_starts_at' });
@@ -112,7 +114,7 @@ describe('admin.js', () => {
     form.dispatchEvent(new Event('submit'));
     await flushPromises();
 
-    const [url, options] = fetchSpy.mock.calls[0];
+    const [url, options] = fetchSpy.mock.calls.find((call) => call[0].endsWith('/admin/events'));
     expect(url).toBe('http://localhost:8080/admin/events');
     const payload = JSON.parse(options.body);
     expect(payload.name).toBe('Concert');
@@ -136,7 +138,9 @@ describe('admin.js', () => {
     form.dispatchEvent(new Event('submit'));
     await flushPromises();
 
-    const [url, options] = fetchSpy.mock.calls[0];
+    const [url, options] = fetchSpy.mock.calls.find((call) =>
+      call[0].endsWith('/admin/events/event-1/zones'),
+    );
     expect(url).toBe('http://localhost:8080/admin/events/event-1/zones');
     const payload = JSON.parse(options.body);
     expect(payload).toEqual({ name: 'Zone A', capacity: 10 });
@@ -153,27 +157,37 @@ describe('admin.js', () => {
 
     document.getElementById('list-events').click();
     await flushPromises();
-    expect(fetchSpy.mock.calls[0][0]).toBe('http://localhost:8080/admin/events');
+    const listEventsCall = fetchSpy.mock.calls.find((call) => call[0].endsWith('/admin/events'));
+    expect(listEventsCall[0]).toBe('http://localhost:8080/admin/events');
 
     const listZones = document.getElementById('list-zones');
     listZones.querySelector('input[name="event_id"]').value = 'event-2';
     listZones.dispatchEvent(new Event('submit'));
     await flushPromises();
-    expect(fetchSpy.mock.calls[1][0]).toBe('http://localhost:8080/admin/events/event-2/zones');
+    const listZonesCall = fetchSpy.mock.calls.find((call) =>
+      call[0].endsWith('/admin/events/event-2/zones'),
+    );
+    expect(listZonesCall[0]).toBe('http://localhost:8080/admin/events/event-2/zones');
 
     const listHolds = document.getElementById('list-active-holds');
     listHolds.querySelector('input[name="event_id"]').value = 'event-3';
     listHolds.querySelector('input[name="zone_id"]').value = 'zone-3';
     listHolds.dispatchEvent(new Event('submit'));
     await flushPromises();
-    expect(fetchSpy.mock.calls[2][0]).toBe('http://localhost:8080/admin/events/event-3/zones/zone-3/holds');
+    const listHoldsCall = fetchSpy.mock.calls.find((call) =>
+      call[0].endsWith('/admin/events/event-3/zones/zone-3/holds'),
+    );
+    expect(listHoldsCall[0]).toBe('http://localhost:8080/admin/events/event-3/zones/zone-3/holds');
 
     const listOrders = document.getElementById('list-confirmed-orders');
     listOrders.querySelector('input[name="event_id"]').value = 'event-4';
     listOrders.querySelector('input[name="zone_id"]').value = 'zone-4';
     listOrders.dispatchEvent(new Event('submit'));
     await flushPromises();
-    expect(fetchSpy.mock.calls[3][0]).toBe('http://localhost:8080/admin/events/event-4/zones/zone-4/orders');
+    const listOrdersCall = fetchSpy.mock.calls.find((call) =>
+      call[0].endsWith('/admin/events/event-4/zones/zone-4/orders'),
+    );
+    expect(listOrdersCall[0]).toBe('http://localhost:8080/admin/events/event-4/zones/zone-4/orders');
   });
 
   it('posts event cancellation', async () => {
@@ -190,7 +204,9 @@ describe('admin.js', () => {
     form.dispatchEvent(new Event('submit'));
     await flushPromises();
 
-    const [url, options] = fetchSpy.mock.calls[0];
+    const [url, options] = fetchSpy.mock.calls.find((call) =>
+      call[0].endsWith('/admin/events/event-9/cancel'),
+    );
     expect(url).toBe('http://localhost:8080/admin/events/event-9/cancel');
     expect(options.method).toBe('POST');
   });

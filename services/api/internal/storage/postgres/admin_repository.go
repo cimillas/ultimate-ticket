@@ -41,12 +41,32 @@ VALUES ($1, $2, $3, $4, $5)`
 	return nil
 }
 
-func (r *AdminRepository) ListEvents(ctx context.Context) ([]domain.Event, error) {
+func (r *AdminRepository) ListEvents(ctx context.Context, now time.Time) ([]domain.Event, error) {
 	const query = `
-SELECT id, name, starts_at, status, cancelled_at
-FROM events
-ORDER BY created_at ASC`
-	rows, err := r.pool.Query(ctx, query)
+WITH zone_availability AS (
+	SELECT z.id,
+	       z.event_id,
+	       z.capacity
+	         - COALESCE(SUM(CASE WHEN h.status = 'active' AND h.expires_at > $1 THEN h.quantity ELSE 0 END), 0)
+	         - COALESCE(SUM(CASE WHEN h.status = 'confirmed' THEN h.quantity ELSE 0 END), 0) AS available
+	FROM zones z
+	LEFT JOIN holds h ON h.zone_id = z.id
+	GROUP BY z.id, z.event_id, z.capacity
+)
+SELECT e.id,
+       e.name,
+       e.starts_at,
+       e.status,
+       e.cancelled_at,
+       CASE
+         WHEN COUNT(za.id) = 0 THEN false
+         ELSE bool_and(za.available <= 0)
+       END AS is_complete
+FROM events e
+LEFT JOIN zone_availability za ON za.event_id = e.id
+GROUP BY e.id, e.name, e.starts_at, e.status, e.cancelled_at, e.created_at
+ORDER BY e.created_at ASC`
+	rows, err := r.pool.Query(ctx, query, now)
 	if err != nil {
 		return nil, fmt.Errorf("list events: %w", err)
 	}
@@ -56,7 +76,7 @@ ORDER BY created_at ASC`
 	for rows.Next() {
 		var event domain.Event
 		var status string
-		if err := rows.Scan(&event.ID, &event.Name, &event.StartsAt, &status, &event.CancelledAt); err != nil {
+		if err := rows.Scan(&event.ID, &event.Name, &event.StartsAt, &status, &event.CancelledAt, &event.IsComplete); err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
 		}
 		event.Status = domain.EventStatus(status)
@@ -187,18 +207,6 @@ VALUES ($1, $2, $3, $4)`
 }
 
 func (r *AdminRepository) ListZonesByEvent(ctx context.Context, eventID string, now time.Time) ([]domain.Zone, error) {
-	const existsQuery = `SELECT EXISTS (SELECT 1 FROM events WHERE id = $1)`
-	var exists bool
-	if err := r.pool.QueryRow(ctx, existsQuery, eventID).Scan(&exists); err != nil {
-		if isInvalidUUID(err) {
-			return nil, domain.ErrInvalidID
-		}
-		return nil, fmt.Errorf("check event: %w", err)
-	}
-	if !exists {
-		return nil, domain.ErrEventNotFound
-	}
-
 	const query = `
 SELECT z.id, z.event_id, z.name, z.capacity,
        z.capacity
@@ -211,6 +219,9 @@ GROUP BY z.id, z.event_id, z.name, z.capacity, z.created_at
 ORDER BY z.created_at ASC`
 	rows, err := r.pool.Query(ctx, query, eventID, now)
 	if err != nil {
+		if isInvalidUUID(err) {
+			return nil, domain.ErrInvalidID
+		}
 		return nil, fmt.Errorf("list zones: %w", err)
 	}
 	defer rows.Close()
@@ -224,7 +235,19 @@ ORDER BY z.created_at ASC`
 		zones = append(zones, zone)
 	}
 	if rows.Err() != nil {
+		if isInvalidUUID(rows.Err()) {
+			return nil, domain.ErrInvalidID
+		}
 		return nil, fmt.Errorf("iterate zones: %w", rows.Err())
+	}
+	if len(zones) == 0 {
+		exists, err := r.eventExists(ctx, eventID)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, domain.ErrEventNotFound
+		}
 	}
 	return zones, nil
 }
@@ -304,30 +327,10 @@ ORDER BY o.created_at ASC`
 }
 
 func (r *AdminRepository) ensureEventAndZone(ctx context.Context, eventID, zoneID string) error {
-	const eventQuery = `SELECT EXISTS (SELECT 1 FROM events WHERE id = $1)`
-	var eventExists bool
-	if err := r.pool.QueryRow(ctx, eventQuery, eventID).Scan(&eventExists); err != nil {
-		if isInvalidUUID(err) {
-			return domain.ErrInvalidID
-		}
-		return fmt.Errorf("check event: %w", err)
+	if err := r.ensureEvent(ctx, eventID); err != nil {
+		return err
 	}
-	if !eventExists {
-		return domain.ErrEventNotFound
-	}
-
-	const zoneQuery = `SELECT EXISTS (SELECT 1 FROM zones WHERE id = $1 AND event_id = $2)`
-	var zoneExists bool
-	if err := r.pool.QueryRow(ctx, zoneQuery, zoneID, eventID).Scan(&zoneExists); err != nil {
-		if isInvalidUUID(err) {
-			return domain.ErrInvalidID
-		}
-		return fmt.Errorf("check zone: %w", err)
-	}
-	if !zoneExists {
-		return domain.ErrZoneNotFound
-	}
-	return nil
+	return r.ensureZone(ctx, eventID, zoneID)
 }
 
 func (r *AdminRepository) exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
@@ -342,4 +345,42 @@ func (r *AdminRepository) queryRow(ctx context.Context, sql string, args ...any)
 		return tx.QueryRow(ctx, sql, args...)
 	}
 	return r.pool.QueryRow(ctx, sql, args...)
+}
+
+func (r *AdminRepository) eventExists(ctx context.Context, eventID string) (bool, error) {
+	const eventQuery = `SELECT EXISTS (SELECT 1 FROM events WHERE id = $1)`
+	var eventExists bool
+	if err := r.pool.QueryRow(ctx, eventQuery, eventID).Scan(&eventExists); err != nil {
+		if isInvalidUUID(err) {
+			return false, domain.ErrInvalidID
+		}
+		return false, fmt.Errorf("check event: %w", err)
+	}
+	return eventExists, nil
+}
+
+func (r *AdminRepository) ensureEvent(ctx context.Context, eventID string) error {
+	exists, err := r.eventExists(ctx, eventID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return domain.ErrEventNotFound
+	}
+	return nil
+}
+
+func (r *AdminRepository) ensureZone(ctx context.Context, eventID, zoneID string) error {
+	const zoneQuery = `SELECT EXISTS (SELECT 1 FROM zones WHERE id = $1 AND event_id = $2)`
+	var zoneExists bool
+	if err := r.pool.QueryRow(ctx, zoneQuery, zoneID, eventID).Scan(&zoneExists); err != nil {
+		if isInvalidUUID(err) {
+			return domain.ErrInvalidID
+		}
+		return fmt.Errorf("check zone: %w", err)
+	}
+	if !zoneExists {
+		return domain.ErrZoneNotFound
+	}
+	return nil
 }

@@ -29,6 +29,16 @@ confirmation fails. Holds cannot be confirmed once an event is closed; those
 holds are marked invalid. If an event is cancelled, confirmed orders are marked
 as refunded.
 
+## User
+Users can register and log in to create holds and confirm them. There are two
+roles: `user` (standard) and `admin` (full access to admin tooling). Admin
+accounts are provisioned via backend configuration.
+
+## Session
+Sessions are stored in the database and tracked via an httpOnly cookie. Sessions
+expire after a TTL and are refreshed on activity (sliding expiration). Invalid
+or expired sessions reject protected endpoints.
+
 ## Typical flow
 1. Create an event.
 2. Create one or more zones for the event.

@@ -1,8 +1,12 @@
-import { request, setupEventPicker, setupZonePicker } from './common.js';
+import { refreshAuthStatus, request, setupEventPicker, setupZonePicker, toggleLoginLink } from './common.js';
 
 const output = document.getElementById('output');
 const requestWithOutput = (path, options) => request(output, path, options);
 
+const authStatus = document.getElementById('auth-status');
+const adminLink = document.getElementById('admin-link');
+const authOnlySections = document.querySelectorAll('[data-auth-only]');
+const logoutButton = document.getElementById('logout-button');
 
 function generateIdempotencyKey() {
   if (window.crypto?.randomUUID) {
@@ -167,15 +171,44 @@ setupEventPicker(output, listZonesForm);
 setupEventPicker(output, holdForm);
 setupZonePicker(output, holdForm);
 
+const updateAuthUI = (user) => {
+  const isAdmin = user?.role === 'admin';
+  if (adminLink) {
+    adminLink.hidden = !isAdmin;
+  }
+  toggleLoginLink(user);
+  authOnlySections.forEach((section) => {
+    section.hidden = !user;
+  });
+};
+
+authOnlySections.forEach((section) => {
+  section.hidden = true;
+});
+
+refreshAuthStatus(authStatus).then(({ user }) => {
+  updateAuthUI(user);
+});
+
+if (logoutButton) {
+  logoutButton.addEventListener('click', async () => {
+    const res = await requestWithOutput('/auth/logout', { method: 'POST' });
+    if (res?.status >= 200 && res.status < 300) {
+      const auth = await refreshAuthStatus(authStatus);
+      updateAuthUI(auth.user);
+    }
+  });
+}
+
 document.getElementById('list-events').addEventListener('click', async () => {
-  await requestWithOutput('/admin/events');
+  await requestWithOutput('/events');
 });
 
 listZonesForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const eventID = form.event_id.value.trim();
-  await requestWithOutput(`/admin/events/${eventID}/zones`);
+  await requestWithOutput(`/events/${eventID}/zones`);
 });
 
 holdForm.addEventListener('submit', async (event) => {

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ultimate Ticket Console - Register</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Ultimate Ticket Console</h1>
+          <p>Create a user account for the console.</p>
+        </div>
+        <div class="header-meta">
+          <nav class="nav">
+            <a href="/">Console</a>
+            <a href="/admin/" id="admin-link" hidden>Admin</a>
+            <a href="/login/" id="login-link">Login</a>
+          </nav>
+          <div class="auth-status" hidden>
+            <span>Signed in:</span>
+            <strong id="auth-status"></strong>
+            <button class="button-secondary" type="button" id="logout-button">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="layout">
+        <div class="stack">
+          <section class="input-section">
+            <h2>Register</h2>
+            <form id="register-form" autocomplete="off">
+              <label>
+                Username
+                <input name="username" required />
+              </label>
+              <label>
+                Email
+                <input name="email" type="email" required />
+              </label>
+              <label>
+                Password
+                <input name="password" type="password" required />
+              </label>
+              <button type="submit">Register</button>
+            </form>
+          </section>
+        </div>
+
+        <section class="response-panel">
+          <h2>Response</h2>
+          <pre id="output"></pre>
+        </section>
+      </div>
+
+      <script type="module" src="/src/auth.js"></script>
+    </main>
+  </body>
+</html>

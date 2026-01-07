@@ -24,6 +24,9 @@ func TestCORS_PreflightAllowed(t *testing.T) {
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
 		t.Fatalf("expected allow origin, got %q", got)
 	}
+	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Fatalf("expected allow credentials, got %q", got)
+	}
 }
 
 func TestCORS_PreflightForbidden(t *testing.T) {

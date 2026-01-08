@@ -23,7 +23,7 @@ go run ./cmd/api
 
 Or from repo root:
 ```bash
-make test
+make test # requires API running and ALLOW_PUBLIC_REGISTER=true for E2E
 make backend-test
 make backend-run
 make backend-fmt
@@ -33,6 +33,7 @@ make backend-lint
 make backend-build
 make backend-auth-bootstrap
 APP_ENV=local CONFIRM=YES make backend-auth-reset
+ALLOW_PUBLIC_REGISTER=true make backend-e2e
 ```
 
 Configuration:

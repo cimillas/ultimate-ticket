@@ -183,7 +183,7 @@ Frontend env variables (from `.env`):
 ## Common commands (from repo root)
 `make test` runs backend + frontend; use the scoped targets below if needed.
 ```bash
-make test
+make test # requires API running and ALLOW_PUBLIC_REGISTER=true for E2E
 make backend-test
 make frontend-test
 make backend-run
@@ -194,6 +194,7 @@ make backend-lint
 make backend-build
 make backend-auth-bootstrap
 APP_ENV=local CONFIRM=YES make backend-auth-reset
+ALLOW_PUBLIC_REGISTER=true make backend-e2e
 ```
 
 ## Repository layout (initial)

@@ -33,7 +33,7 @@ extraction to avoid cascading changes.
    - `starts_at` closes events.
    - Hold expiry and confirmation rules.
 
-## Freeze status (v0.4.0)
+## Freeze status (v0.4.1)
 Checked items are considered **frozen** for the next 2–3 iterations.
 
 - [x] API inventory captured in `docs/contracts/api-inventory.md`

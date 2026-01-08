@@ -1,4 +1,4 @@
-# API contract inventory (v0.4.0)
+# API contract inventory (v0.4.1)
 
 ## Goal
 List the current API surface, auth requirements, required headers, and error

@@ -6,5 +6,5 @@ breaking changes in a release, add a short "None" entry.
 ## [Unreleased]
 - None.
 
-## [0.4.0]
+## [0.4.1]
 - None.

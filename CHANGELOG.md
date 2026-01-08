@@ -7,6 +7,14 @@ This project follows Semantic Versioning (SemVer).
 ## [Unreleased]
 
 ## [0.4.1]
+- Added service boundaries ADR and extraction readiness docs.
+- Added API inventory, compatibility checklist, and breaking changes log.
+- Added observability plan, E2E plan, and extraction roadmap.
+- Added API versioning ADR.
+- Added curl-based E2E validation script and Makefile target.
+- Documented E2E and logging usage in READMEs.
+
+## [0.4.0]
 - Added session-based auth with user registration, login/logout, and admin role enforcement.
 - Added public event/zone listing endpoints and protected holds/confirmations.
 - Updated frontend to include login/register UI and cookie-based requests.
@@ -15,15 +23,6 @@ This project follows Semantic Versioning (SemVer).
 - Disallowed `@` in usernames and removed login identifier ambiguity.
 - Added `ALLOW_PUBLIC_REGISTER` flag to disable public registration outside local.
 - Added request ID middleware and JSON request logs (status, latency, bytes, IP, agent).
-- Added ADR for service boundaries and extraction readiness.
-- Added E2E test plan for critical flows.
-- Added observability readiness plan (multi-service).
-- Added contract compatibility checklist for pre-extraction readiness.
-- Added microservices extraction roadmap.
-- Added API contract inventory for extraction readiness.
-- Added ADR for API versioning strategy.
-- Added curl-based E2E validation script.
-- Added breaking changes log for API contract governance.
 
 ## [0.3.0]
 - Added event cancellation flow with refunds, cancellation timestamps, and admin endpoint.

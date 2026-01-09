@@ -26,9 +26,11 @@ func TestCreateHold_HTTPIntegration(t *testing.T) {
 	ctx := context.Background()
 	testutil.TruncateAll(t, ctx, pool)
 	eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+	userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
 
 	body := []byte(`{"event_id":"` + eventID + `","zone_id":"` + zoneID + `","quantity":3,"idempotency_key":"idem-1"}`)
 	req := httptest.NewRequest(http.MethodPost, "/holds", bytes.NewBuffer(body))
+	req = withAuth(req, userID)
 	rec := httptest.NewRecorder()
 
 	HandleCreateHold(svc).ServeHTTP(rec, req)
@@ -60,6 +62,7 @@ func TestCreateHold_HTTPIntegration(t *testing.T) {
 	}
 
 	req2 := httptest.NewRequest(http.MethodPost, "/holds", bytes.NewBuffer(body))
+	req2 = withAuth(req2, userID)
 	rec2 := httptest.NewRecorder()
 	HandleCreateHold(svc).ServeHTTP(rec2, req2)
 
@@ -77,6 +80,7 @@ func TestCreateHold_HTTPIntegration(t *testing.T) {
 
 	conflictBody := []byte(`{"event_id":"` + eventID + `","zone_id":"` + zoneID + `","quantity":4,"idempotency_key":"idem-1"}`)
 	req3 := httptest.NewRequest(http.MethodPost, "/holds", bytes.NewBuffer(conflictBody))
+	req3 = withAuth(req3, userID)
 	rec3 := httptest.NewRecorder()
 	HandleCreateHold(svc).ServeHTTP(rec3, req3)
 
@@ -94,6 +98,7 @@ func TestCreateHold_EventStarted_HTTPIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	testutil.TruncateAll(t, ctx, pool)
+	userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
 
 	var eventID string
 	if err := pool.QueryRow(ctx,
@@ -113,6 +118,7 @@ func TestCreateHold_EventStarted_HTTPIntegration(t *testing.T) {
 
 	body := []byte(`{"event_id":"` + eventID + `","zone_id":"` + zoneID + `","quantity":3,"idempotency_key":"idem-started"}`)
 	req := httptest.NewRequest(http.MethodPost, "/holds", bytes.NewBuffer(body))
+	req = withAuth(req, userID)
 	rec := httptest.NewRecorder()
 
 	HandleCreateHold(svc).ServeHTTP(rec, req)
@@ -143,6 +149,7 @@ func TestCreateAndConfirm_HTTPIntegration(t *testing.T) {
 	ctx := context.Background()
 	testutil.TruncateAll(t, ctx, pool)
 	eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+	userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
 
 	mux := http.NewServeMux()
 	mux.Handle("/holds", HandleCreateHold(holdSvc))
@@ -150,6 +157,7 @@ func TestCreateAndConfirm_HTTPIntegration(t *testing.T) {
 
 	body := []byte(`{"event_id":"` + eventID + `","zone_id":"` + zoneID + `","quantity":2,"idempotency_key":"idem-create"}`)
 	req := httptest.NewRequest(http.MethodPost, "/holds", bytes.NewBuffer(body))
+	req = withAuth(req, userID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -167,6 +175,7 @@ func TestCreateAndConfirm_HTTPIntegration(t *testing.T) {
 
 	confirmReq := httptest.NewRequest(http.MethodPost, "/holds/"+created.ID+"/confirm", nil)
 	confirmReq.Header.Set(idempotencyHeader, "idem-confirm")
+	confirmReq = withAuth(confirmReq, userID)
 	confirmRec := httptest.NewRecorder()
 	mux.ServeHTTP(confirmRec, confirmReq)
 
@@ -184,6 +193,7 @@ func TestCreateAndConfirm_HTTPIntegration(t *testing.T) {
 
 	confirmReq2 := httptest.NewRequest(http.MethodPost, "/holds/"+created.ID+"/confirm", nil)
 	confirmReq2.Header.Set(idempotencyHeader, "idem-confirm")
+	confirmReq2 = withAuth(confirmReq2, userID)
 	confirmRec2 := httptest.NewRecorder()
 	mux.ServeHTTP(confirmRec2, confirmReq2)
 

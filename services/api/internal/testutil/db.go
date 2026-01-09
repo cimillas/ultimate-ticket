@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -85,15 +86,40 @@ func InsertEventAndZone(t *testing.T, ctx context.Context, pool *pgxpool.Pool, n
 
 func InsertHold(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID, zoneID string, hold domain.Hold) string {
 	t.Helper()
+	if hold.UserID == "" {
+		hold.UserID = InsertUser(t, ctx, pool, domain.UserRoleUser)
+	}
 	var id string
 	err := pool.QueryRow(ctx, `
-INSERT INTO holds (event_id, zone_id, quantity, status, expires_at, idempotency_key)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO holds (event_id, zone_id, user_id, quantity, status, expires_at, idempotency_key)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id`,
-		eventID, zoneID, hold.Quantity, hold.Status, hold.ExpiresAt, hold.IdempotencyKey,
+		eventID, zoneID, hold.UserID, hold.Quantity, hold.Status, hold.ExpiresAt, hold.IdempotencyKey,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("insert hold: %v", err)
+	}
+	return id
+}
+
+func InsertUser(t *testing.T, ctx context.Context, pool *pgxpool.Pool, role domain.UserRole) string {
+	t.Helper()
+	if role == "" {
+		role = domain.UserRoleUser
+	}
+	suffix := time.Now().UnixNano()
+	username := fmt.Sprintf("user-%d", suffix)
+	email := fmt.Sprintf("user-%d@example.com", suffix)
+	passwordHash := "test-hash"
+
+	var id string
+	if err := pool.QueryRow(ctx, `
+INSERT INTO users (username, email, password_hash, role)
+VALUES ($1, $2, $3, $4)
+RETURNING id`,
+		username, email, passwordHash, role,
+	).Scan(&id); err != nil {
+		t.Fatalf("insert user: %v", err)
 	}
 	return id
 }

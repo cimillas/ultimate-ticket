@@ -91,15 +91,17 @@ func TestHoldRepository(t *testing.T) {
 		ctx := context.Background()
 		testutil.TruncateAll(t, ctx, pool)
 		eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 50)
+		userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
 
 		holdID := testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+			UserID:         userID,
 			Status:         domain.HoldStatusActive,
 			Quantity:       5,
 			ExpiresAt:      time.Now().Add(10 * time.Minute).UTC(),
 			IdempotencyKey: "idem-1",
 		})
 
-		h, err := repo.FindHoldByIdempotencyKey(ctx, eventID, zoneID, "idem-1")
+		h, err := repo.FindHoldByIdempotencyKey(ctx, eventID, zoneID, userID, "idem-1")
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -107,7 +109,7 @@ func TestHoldRepository(t *testing.T) {
 			t.Fatalf("unexpected hold: %+v", h)
 		}
 
-		h, err = repo.FindHoldByIdempotencyKey(ctx, eventID, zoneID, "missing")
+		h, err = repo.FindHoldByIdempotencyKey(ctx, eventID, zoneID, userID, "missing")
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -175,12 +177,14 @@ func TestHoldRepository(t *testing.T) {
 		ctx := context.Background()
 		testutil.TruncateAll(t, ctx, pool)
 		eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+		userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
 		now := time.Now().UTC()
 
 		hold := domain.Hold{
 			ID:             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			EventID:        eventID,
 			ZoneID:         zoneID,
+			UserID:         userID,
 			Quantity:       5,
 			Status:         domain.HoldStatusActive,
 			ExpiresAt:      now.Add(10 * time.Minute),

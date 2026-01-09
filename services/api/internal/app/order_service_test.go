@@ -16,10 +16,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	defaultEventStart := now.Add(1 * time.Hour)
 
 	t.Run("creates order for active hold", func(t *testing.T) {
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-1": {
 				ID:        "hold-1",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusActive,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -28,6 +30,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		res, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-1",
+			UserID:         userID,
 			IdempotencyKey: "idem-1",
 		})
 		if err != nil {
@@ -62,10 +65,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 			IdempotencyKey: "idem-1",
 			CreatedAt:      now.Add(-1 * time.Minute),
 		}
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-2": {
 				ID:        "hold-2",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusConfirmed,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -76,6 +81,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		res, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-2",
+			UserID:         userID,
 			IdempotencyKey: "idem-1",
 		})
 		if err != nil {
@@ -90,10 +96,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	})
 
 	t.Run("different idempotency key after confirmed returns error", func(t *testing.T) {
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-3": {
 				ID:        "hold-3",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusConfirmed,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -109,6 +117,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		_, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-3",
+			UserID:         userID,
 			IdempotencyKey: "idem-2",
 		})
 		if err != domain.ErrHoldAlreadyConfirmed {
@@ -117,10 +126,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	})
 
 	t.Run("expired hold returns error", func(t *testing.T) {
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-4": {
 				ID:        "hold-4",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusActive,
 				ExpiresAt: now.Add(-1 * time.Minute),
 			},
@@ -129,6 +140,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		_, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-4",
+			UserID:         userID,
 			IdempotencyKey: "idem-1",
 		})
 		if err != domain.ErrHoldExpired {
@@ -137,10 +149,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	})
 
 	t.Run("missing idempotency key returns error", func(t *testing.T) {
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-5": {
 				ID:        "hold-5",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusActive,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -149,6 +163,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		_, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-5",
+			UserID:         userID,
 			IdempotencyKey: "",
 		})
 		if err != domain.ErrIdempotencyKeyRequired {
@@ -162,6 +177,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		_, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "missing",
+			UserID:         "user-1",
 			IdempotencyKey: "idem-1",
 		})
 		if err != domain.ErrHoldNotFound {
@@ -170,10 +186,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	})
 
 	t.Run("idempotent on create conflict when order exists", func(t *testing.T) {
+		userID := "user-1"
 		repo := &raceOrderRepo{
 			hold: domain.Hold{
 				ID:        "hold-6",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusActive,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -189,6 +207,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		res, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-6",
+			UserID:         userID,
 			IdempotencyKey: "idem-1",
 		})
 		if err != nil {
@@ -203,10 +222,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	})
 
 	t.Run("event started cancels hold", func(t *testing.T) {
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-7": {
 				ID:        "hold-7",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusActive,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -215,6 +236,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		_, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-7",
+			UserID:         userID,
 			IdempotencyKey: "idem-started",
 		})
 		if err != domain.ErrEventClosed {
@@ -234,10 +256,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	})
 
 	t.Run("event cancelled blocks confirmation", func(t *testing.T) {
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-8": {
 				ID:        "hold-8",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusActive,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -246,6 +270,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		_, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-8",
+			UserID:         userID,
 			IdempotencyKey: "idem-cancelled",
 		})
 		if err != domain.ErrEventCancelled {
@@ -269,10 +294,12 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 			Status:         domain.OrderStatusRefunded,
 			CreatedAt:      now.Add(-2 * time.Minute),
 		}
+		userID := "user-1"
 		repo := newFakeOrderRepo(map[string]domain.Hold{
 			"hold-9": {
 				ID:        "hold-9",
 				EventID:   "event-1",
+				UserID:    userID,
 				Status:    domain.HoldStatusConfirmed,
 				ExpiresAt: now.Add(10 * time.Minute),
 			},
@@ -283,6 +310,7 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 
 		res, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
 			HoldID:         "hold-9",
+			UserID:         userID,
 			IdempotencyKey: "idem-9",
 		})
 		if err != nil {
@@ -293,6 +321,28 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 		}
 		if res.Order.Status != domain.OrderStatusRefunded {
 			t.Fatalf("expected refunded order, got %s", res.Order.Status)
+		}
+	})
+
+	t.Run("hold owned by another user returns not found", func(t *testing.T) {
+		repo := newFakeOrderRepo(map[string]domain.Hold{
+			"hold-10": {
+				ID:        "hold-10",
+				EventID:   "event-1",
+				UserID:    "user-1",
+				Status:    domain.HoldStatusActive,
+				ExpiresAt: now.Add(10 * time.Minute),
+			},
+		}, nil, nil, defaultEventStart)
+		svc := NewOrderService(repo, clock.NewFixed(now))
+
+		_, err := svc.ConfirmHold(context.Background(), ConfirmHoldInput{
+			HoldID:         "hold-10",
+			UserID:         "user-2",
+			IdempotencyKey: "idem-1",
+		})
+		if err != domain.ErrHoldNotFound {
+			t.Fatalf("expected ErrHoldNotFound, got %v", err)
 		}
 	})
 }

@@ -20,11 +20,9 @@ Out of scope (for now):
 ## Environment
 Recommended default: local Docker dependencies + local API/frontend.
 Required env vars:
-- `DATABASE_URL`
-- `CORS_ORIGINS`
-- `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL`
-- `ALLOW_PUBLIC_REGISTER` (true for local testing)
-- `VITE_API_BASE_URL`
+- Backend (`services/api/.env`): `DATABASE_URL`, `CORS_ORIGINS`, `ADMIN_USERNAME`,
+  `ADMIN_PASSWORD`, `ADMIN_EMAIL`, `ALLOW_PUBLIC_REGISTER` (true for local testing).
+- Frontend (`frontend/.env`): `VITE_API_BASE_URL`.
 
 ## Data strategy
 Recommended default: seed via API calls (not raw SQL) to validate real behavior.

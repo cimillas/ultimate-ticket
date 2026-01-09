@@ -31,6 +31,7 @@ func NewOrderService(repo OrderRepository, clk clock.Clock) *OrderService {
 
 type ConfirmHoldInput struct {
 	HoldID         string
+	UserID         string
 	IdempotencyKey string
 }
 
@@ -43,6 +44,9 @@ func (s *OrderService) ConfirmHold(ctx context.Context, in ConfirmHoldInput) (Co
 	if in.IdempotencyKey == "" {
 		return ConfirmHoldResult{}, domain.ErrIdempotencyKeyRequired
 	}
+	if in.UserID == "" {
+		return ConfirmHoldResult{}, domain.ErrUnauthorized
+	}
 
 	now := s.clock.Now()
 	var result ConfirmHoldResult
@@ -52,6 +56,9 @@ func (s *OrderService) ConfirmHold(ctx context.Context, in ConfirmHoldInput) (Co
 		hold, startsAt, eventStatus, err := s.repo.GetHoldForUpdate(txCtx, in.HoldID)
 		if err != nil {
 			return err
+		}
+		if hold.UserID == "" || hold.UserID != in.UserID {
+			return domain.ErrHoldNotFound
 		}
 
 		existing, err := s.repo.GetOrderByHoldID(txCtx, in.HoldID)

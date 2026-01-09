@@ -25,7 +25,7 @@ func (r *OrderRepository) WithTx(ctx context.Context, fn func(ctx context.Contex
 
 func (r *OrderRepository) GetHoldForUpdate(ctx context.Context, holdID string) (domain.Hold, time.Time, domain.EventStatus, error) {
 	const query = `
-SELECT h.id, h.event_id, h.zone_id, h.quantity, h.status, h.expires_at, e.starts_at, e.status
+SELECT h.id, h.event_id, h.zone_id, h.user_id, h.quantity, h.status, h.expires_at, e.starts_at, e.status
 FROM holds h
 JOIN events e ON e.id = h.event_id
 WHERE h.id = $1
@@ -36,7 +36,7 @@ FOR UPDATE OF h, e`
 	var startsAt time.Time
 	var eventStatus string
 	err := r.queryRow(ctx, query, holdID).
-		Scan(&h.ID, &h.EventID, &h.ZoneID, &h.Quantity, &status, &h.ExpiresAt, &startsAt, &eventStatus)
+		Scan(&h.ID, &h.EventID, &h.ZoneID, &h.UserID, &h.Quantity, &status, &h.ExpiresAt, &startsAt, &eventStatus)
 	if err != nil {
 		if isInvalidUUID(err) {
 			return domain.Hold{}, time.Time{}, "", domain.ErrInvalidID

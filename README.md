@@ -13,6 +13,9 @@ High-scale ticketing prototype focused on:
 
 Full reference: `docs/concepts.md`
 
+## Documentation
+Start here: `docs/README.md`
+
 ## Quickstart (local)
 Requirements:
 - Docker + Docker Compose
@@ -28,6 +31,7 @@ Services:
 
 API (default config)
 - Base URL: `http://localhost:8080`
+- Env file: `services/api/.env` (copy from `services/api/.env.example`)
 - Env:
   - `APP_ENV` (set to `local` to allow auth resets)
   - `PORT` (default: `8080`)
@@ -58,6 +62,7 @@ API (default config)
   - Protected:
     - `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}` (requires login)
     - `POST /holds/{id}/confirm` with header `Idempotency-Key` (requires login)
+    - Holds are owned by the authenticated user; idempotency keys are scoped per user.
   - Admin (local tooling only, requires admin login):
     - `POST /admin/events` + `GET /admin/events`
     - `POST /admin/events/{event_id}/cancel`
@@ -147,14 +152,15 @@ Example:
 
 ## Frontend (local)
 This frontend is intentionally minimal and decoupled. It reads variables from the
-repo root `.env` (see `.env.example`).
+`frontend/.env` (see `frontend/.env.example`).
 
 Setup:
 ```bash
-cp .env.example .env
+cp services/api/.env.example services/api/.env
+cp frontend/.env.example frontend/.env
 ```
 
-Run backend (from repo root; `.env` is auto-loaded if present):
+Run backend (from repo root; loads `services/api/.env` if present):
 ```bash
 make backend-run
 ```
@@ -177,7 +183,7 @@ Frontend pages:
 - Register: `http://localhost:5173/register/`
 Idempotency keys are auto-generated in the UI and can be edited or regenerated for debugging.
 
-Frontend env variables (from `.env`):
+Frontend env variables (from `frontend/.env`):
 - `VITE_API_BASE_URL` (e.g. `http://localhost:8080`)
 - `FRONTEND_PORT` (default: `5173`)
 ## Common commands (from repo root)

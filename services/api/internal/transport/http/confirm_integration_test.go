@@ -24,7 +24,9 @@ func TestConfirmHold_HTTPIntegration(t *testing.T) {
 	ctx := context.Background()
 	testutil.TruncateAll(t, ctx, pool)
 	eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+	userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
 	holdID := testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+		UserID:         userID,
 		Status:         domain.HoldStatusActive,
 		Quantity:       2,
 		ExpiresAt:      time.Now().UTC().Add(10 * time.Minute),
@@ -35,6 +37,7 @@ func TestConfirmHold_HTTPIntegration(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/holds/"+holdID+"/confirm", nil)
 	req.Header.Set(idempotencyHeader, "idem-confirm")
+	req = withAuth(req, userID)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -53,6 +56,7 @@ func TestConfirmHold_HTTPIntegration(t *testing.T) {
 
 	req2 := httptest.NewRequest(http.MethodPost, "/holds/"+holdID+"/confirm", nil)
 	req2.Header.Set(idempotencyHeader, "idem-confirm")
+	req2 = withAuth(req2, userID)
 	rec2 := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec2, req2)
@@ -87,6 +91,7 @@ func TestConfirmHold_EventStarted_HTTPIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	testutil.TruncateAll(t, ctx, pool)
+	userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
 
 	var eventID string
 	if err := pool.QueryRow(ctx,
@@ -105,6 +110,7 @@ func TestConfirmHold_EventStarted_HTTPIntegration(t *testing.T) {
 	}
 
 	holdID := testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+		UserID:         userID,
 		Status:         domain.HoldStatusActive,
 		Quantity:       2,
 		ExpiresAt:      now.Add(10 * time.Minute),
@@ -115,6 +121,7 @@ func TestConfirmHold_EventStarted_HTTPIntegration(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/holds/"+holdID+"/confirm", nil)
 	req.Header.Set(idempotencyHeader, "idem-confirm")
+	req = withAuth(req, userID)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

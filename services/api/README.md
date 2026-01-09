@@ -37,6 +37,7 @@ ALLOW_PUBLIC_REGISTER=true make backend-e2e
 ```
 
 Configuration:
+- Env file: `services/api/.env` (copy from `services/api/.env.example`)
 - `APP_ENV` (set to `local` to allow auth resets)
 - `PORT` (default: `8080`)
 - `DATABASE_URL` (default: `postgres://ultimate_ticket:ultimate_ticket@localhost:5432/ultimate_ticket?sslmode=disable`)
@@ -49,6 +50,7 @@ Configuration:
 - `ALLOW_PUBLIC_REGISTER` (default: `true` in `APP_ENV=local`, `false` otherwise)
 
 The API loads `.env` automatically when present (current dir or parent directories).
+For local runs, keep `services/api/.env` alongside the Go module.
 
 Endpoints:
 - `GET /health` → `ok`

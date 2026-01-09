@@ -46,15 +46,15 @@ FOR UPDATE OF z, e`
 	return z, startsAt, domain.EventStatus(status), nil
 }
 
-func (r *HoldRepository) FindHoldByIdempotencyKey(ctx context.Context, eventID, zoneID, key string) (*domain.Hold, error) {
+func (r *HoldRepository) FindHoldByIdempotencyKey(ctx context.Context, eventID, zoneID, userID, key string) (*domain.Hold, error) {
 	const query = `
-SELECT id, event_id, zone_id, quantity, status, expires_at, idempotency_key, created_at
+SELECT id, event_id, zone_id, user_id, quantity, status, expires_at, idempotency_key, created_at
 FROM holds
-WHERE event_id = $1 AND zone_id = $2 AND idempotency_key = $3`
+WHERE event_id = $1 AND zone_id = $2 AND user_id = $3 AND idempotency_key = $4`
 
 	var h domain.Hold
-	err := r.queryRow(ctx, query, eventID, zoneID, key).
-		Scan(&h.ID, &h.EventID, &h.ZoneID, &h.Quantity, &h.Status, &h.ExpiresAt, &h.IdempotencyKey, &h.CreatedAt)
+	err := r.queryRow(ctx, query, eventID, zoneID, userID, key).
+		Scan(&h.ID, &h.EventID, &h.ZoneID, &h.UserID, &h.Quantity, &h.Status, &h.ExpiresAt, &h.IdempotencyKey, &h.CreatedAt)
 	if err != nil {
 		if isInvalidUUID(err) {
 			return nil, domain.ErrInvalidID
@@ -101,13 +101,14 @@ WHERE event_id = $1 AND zone_id = $2 AND status = 'confirmed'`
 
 func (r *HoldRepository) CreateHold(ctx context.Context, hold domain.Hold) error {
 	const stmt = `
-INSERT INTO holds (id, event_id, zone_id, quantity, status, expires_at, idempotency_key, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+INSERT INTO holds (id, event_id, zone_id, user_id, quantity, status, expires_at, idempotency_key, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 	_, err := r.exec(ctx, stmt,
 		hold.ID,
 		hold.EventID,
 		hold.ZoneID,
+		hold.UserID,
 		hold.Quantity,
 		hold.Status,
 		hold.ExpiresAt,

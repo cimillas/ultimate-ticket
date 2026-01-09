@@ -6,16 +6,30 @@ set -euo pipefail
 #   ALLOW_PUBLIC_REGISTER=true ./scripts/e2e/run.sh
 # Notes:
 # - API must be running locally.
-# - Requires ADMIN_USERNAME/ADMIN_PASSWORD/ADMIN_EMAIL (loaded from .env).
+# - Requires ADMIN_USERNAME/ADMIN_PASSWORD/ADMIN_EMAIL (loaded from services/api/.env).
 # - Optional: set API_BASE_URL or VITE_API_BASE_URL to target another host.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_FILE="$ROOT_DIR/.env"
+ROOT_ENV_FILE="$ROOT_DIR/.env"
+BACKEND_ENV_FILE="$ROOT_DIR/services/api/.env"
+FRONTEND_ENV_FILE="$ROOT_DIR/frontend/.env"
 
-if [[ -f "$ENV_FILE" ]]; then
+if [[ -f "$ROOT_ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
-  . "$ENV_FILE"
+  . "$ROOT_ENV_FILE"
+  set +a
+fi
+if [[ -f "$BACKEND_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$BACKEND_ENV_FILE"
+  set +a
+fi
+if [[ -f "$FRONTEND_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$FRONTEND_ENV_FILE"
   set +a
 fi
 

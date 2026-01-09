@@ -16,6 +16,7 @@ type Hold struct {
 	ID             string
 	EventID        string
 	ZoneID         string
+	UserID         string
 	Quantity       int
 	Status         HoldStatus
 	ExpiresAt      time.Time

@@ -59,6 +59,7 @@ Local dependencies:
 - API expects `DATABASE_URL` (defaults to the local Postgres DSN above)
 - CORS allow-list via `CORS_ORIGINS` (comma-separated)
  - `.env` is auto-loaded when present (current dir or parent directories)
+ - Local env files: backend in `services/api/.env`, frontend in `frontend/.env`
 
 API endpoints:
 - `POST /holds` expects `idempotency_key` in the JSON body.
@@ -136,7 +137,7 @@ For integration tests:
 
 ## 10) Security & secrets
 - NEVER commit secrets, tokens, credentials, private keys.
-- Use env vars + local `.env` (gitignored) for development.
+- Use env vars + local `.env` files (gitignored) for development (`services/api/.env`, `frontend/.env`).
 - Security-sensitive features will be designed explicitly and reviewed.
 
 ## 11) Documentation: ADRs

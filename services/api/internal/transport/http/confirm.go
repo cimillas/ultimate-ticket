@@ -32,6 +32,12 @@ func HandleConfirmHold(svc HoldConfirmer) http.HandlerFunc {
 			return
 		}
 
+		session, ok := AuthFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, codeUnauthorized, domain.ErrUnauthorized.Error())
+			return
+		}
+
 		key := r.Header.Get(idempotencyHeader)
 		if key == "" {
 			writeError(w, http.StatusBadRequest, codeIdempotencyRequired, domain.ErrIdempotencyKeyRequired.Error())
@@ -40,10 +46,14 @@ func HandleConfirmHold(svc HoldConfirmer) http.HandlerFunc {
 
 		res, err := svc.ConfirmHold(r.Context(), app.ConfirmHoldInput{
 			HoldID:         holdID,
+			UserID:         session.User.ID,
 			IdempotencyKey: key,
 		})
 		if err != nil {
 			switch err {
+			case domain.ErrUnauthorized:
+				writeError(w, http.StatusUnauthorized, codeUnauthorized, err.Error())
+				return
 			case domain.ErrHoldNotFound:
 				writeError(w, http.StatusNotFound, codeHoldNotFound, err.Error())
 				return

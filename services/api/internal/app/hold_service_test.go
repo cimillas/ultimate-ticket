@@ -22,11 +22,12 @@ func TestHoldService_CreateHold(t *testing.T) {
 	}
 
 	t.Run("creates hold when capacity available", func(t *testing.T) {
+		userID := "user-1"
 		svc, repo := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 100}},
 			[]domain.Hold{
-				{EventID: "event-1", ZoneID: "zone-1", Quantity: 30, Status: domain.HoldStatusActive, ExpiresAt: now.Add(10 * time.Minute)},
-				{EventID: "event-1", ZoneID: "zone-1", Quantity: 20, Status: domain.HoldStatusConfirmed},
+				{EventID: "event-1", ZoneID: "zone-1", UserID: userID, Quantity: 30, Status: domain.HoldStatusActive, ExpiresAt: now.Add(10 * time.Minute)},
+				{EventID: "event-1", ZoneID: "zone-1", UserID: userID, Quantity: 20, Status: domain.HoldStatusConfirmed},
 			},
 			nil,
 		)
@@ -34,6 +35,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		hold, err := svc.CreateHold(context.Background(), CreateHoldInput{
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       10,
 			IdempotencyKey: "idem-1",
 		})
@@ -56,10 +58,12 @@ func TestHoldService_CreateHold(t *testing.T) {
 	})
 
 	t.Run("returns existing hold on idempotency key", func(t *testing.T) {
+		userID := "user-1"
 		existing := domain.Hold{
 			ID:              "hold-1",
 			EventID:         "event-1",
 			ZoneID:          "zone-1",
+			UserID:          userID,
 			Quantity:        5,
 			Status:          domain.HoldStatusActive,
 			ExpiresAt:       now.Add(ttl),
@@ -77,6 +81,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		hold, err := svc.CreateHold(context.Background(), CreateHoldInput{
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       5,
 			IdempotencyKey: "idem-1",
 		})
@@ -91,11 +96,49 @@ func TestHoldService_CreateHold(t *testing.T) {
 		}
 	})
 
+	t.Run("idempotency scoped per user", func(t *testing.T) {
+		existing := domain.Hold{
+			ID:             "hold-1",
+			EventID:        "event-1",
+			ZoneID:         "zone-1",
+			UserID:         "user-1",
+			Quantity:       5,
+			Status:         domain.HoldStatusActive,
+			ExpiresAt:      now.Add(ttl),
+			IdempotencyKey: "idem-1",
+		}
+
+		svc, repo := makeSvc(
+			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 50}},
+			[]domain.Hold{existing},
+			nil,
+		)
+
+		hold, err := svc.CreateHold(context.Background(), CreateHoldInput{
+			EventID:        "event-1",
+			ZoneID:         "zone-1",
+			UserID:         "user-2",
+			Quantity:       5,
+			IdempotencyKey: "idem-1",
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if hold.ID == existing.ID {
+			t.Fatalf("expected a new hold for a different user")
+		}
+		if len(repo.holds) != 2 {
+			t.Fatalf("expected 2 holds in repo, got %d", len(repo.holds))
+		}
+	})
+
 	t.Run("idempotency conflict on quantity mismatch", func(t *testing.T) {
+		userID := "user-1"
 		existing := domain.Hold{
 			ID:             "hold-2",
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       5,
 			Status:         domain.HoldStatusActive,
 			ExpiresAt:      now.Add(ttl),
@@ -112,6 +155,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       7,
 			IdempotencyKey: "idem-2",
 		})
@@ -121,10 +165,11 @@ func TestHoldService_CreateHold(t *testing.T) {
 	})
 
 	t.Run("fails when capacity exceeded", func(t *testing.T) {
+		userID := "user-1"
 		svc, repo := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 100}},
 			[]domain.Hold{
-				{EventID: "event-1", ZoneID: "zone-1", Quantity: 90, Status: domain.HoldStatusActive, ExpiresAt: now.Add(5 * time.Minute)},
+				{EventID: "event-1", ZoneID: "zone-1", UserID: userID, Quantity: 90, Status: domain.HoldStatusActive, ExpiresAt: now.Add(5 * time.Minute)},
 			},
 			nil,
 		)
@@ -132,6 +177,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       20,
 			IdempotencyKey: "idem-2",
 		})
@@ -147,10 +193,11 @@ func TestHoldService_CreateHold(t *testing.T) {
 	})
 
 	t.Run("expired holds free capacity", func(t *testing.T) {
+		userID := "user-1"
 		svc, _ := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 100}},
 			[]domain.Hold{
-				{EventID: "event-1", ZoneID: "zone-1", Quantity: 80, Status: domain.HoldStatusActive, ExpiresAt: now.Add(-1 * time.Minute)},
+				{EventID: "event-1", ZoneID: "zone-1", UserID: userID, Quantity: 80, Status: domain.HoldStatusActive, ExpiresAt: now.Add(-1 * time.Minute)},
 			},
 			nil,
 		)
@@ -158,6 +205,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		hold, err := svc.CreateHold(context.Background(), CreateHoldInput{
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       50,
 			IdempotencyKey: "idem-3",
 		})
@@ -170,6 +218,26 @@ func TestHoldService_CreateHold(t *testing.T) {
 	})
 
 	t.Run("missing idempotency key returns error", func(t *testing.T) {
+		userID := "user-1"
+		svc, _ := makeSvc(
+			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 100}},
+			nil,
+			nil,
+		)
+
+		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
+			EventID:        "event-1",
+			ZoneID:         "zone-1",
+			UserID:         userID,
+			Quantity:       1,
+			IdempotencyKey: "",
+		})
+		if err != domain.ErrIdempotencyKeyRequired {
+			t.Fatalf("expected ErrIdempotencyKeyRequired, got %v", err)
+		}
+	})
+
+	t.Run("missing user returns error", func(t *testing.T) {
 		svc, _ := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 100}},
 			nil,
@@ -180,14 +248,15 @@ func TestHoldService_CreateHold(t *testing.T) {
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
 			Quantity:       1,
-			IdempotencyKey: "",
+			IdempotencyKey: "idem-user",
 		})
-		if err != domain.ErrIdempotencyKeyRequired {
-			t.Fatalf("expected ErrIdempotencyKeyRequired, got %v", err)
+		if err != domain.ErrUnauthorized {
+			t.Fatalf("expected ErrUnauthorized, got %v", err)
 		}
 	})
 
 	t.Run("rejects holds after event start", func(t *testing.T) {
+		userID := "user-1"
 		svc, repo := makeSvc(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 10}},
 			nil,
@@ -197,6 +266,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       1,
 			IdempotencyKey: "idem-started",
 		})
@@ -212,6 +282,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 	})
 
 	t.Run("rejects holds when event is cancelled", func(t *testing.T) {
+		userID := "user-1"
 		repo := newFakeHoldRepo(
 			[]domain.Zone{{ID: "zone-1", EventID: "event-1", Capacity: 10}},
 			nil,
@@ -224,6 +295,7 @@ func TestHoldService_CreateHold(t *testing.T) {
 		_, err := svc.CreateHold(context.Background(), CreateHoldInput{
 			EventID:        "event-1",
 			ZoneID:         "zone-1",
+			UserID:         userID,
 			Quantity:       1,
 			IdempotencyKey: "idem-cancelled",
 		})
@@ -283,10 +355,10 @@ func (f *fakeHoldRepo) GetZoneForUpdate(_ context.Context, eventID, zoneID strin
 	return zone, startsAt, status, nil
 }
 
-func (f *fakeHoldRepo) FindHoldByIdempotencyKey(_ context.Context, eventID, zoneID, key string) (*domain.Hold, error) {
+func (f *fakeHoldRepo) FindHoldByIdempotencyKey(_ context.Context, eventID, zoneID, userID, key string) (*domain.Hold, error) {
 	for i := range f.holds {
 		h := f.holds[i]
-		if h.EventID == eventID && h.ZoneID == zoneID && h.IdempotencyKey == key {
+		if h.EventID == eventID && h.ZoneID == zoneID && h.UserID == userID && h.IdempotencyKey == key {
 			return &h, nil
 		}
 	}

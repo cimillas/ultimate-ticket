@@ -23,6 +23,11 @@ func HandleCreateHold(svc HoldCreator) http.HandlerFunc {
 			writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
 			return
 		}
+		session, ok := AuthFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, codeUnauthorized, domain.ErrUnauthorized.Error())
+			return
+		}
 
 		var req createHoldRequest
 		dec := json.NewDecoder(r.Body)
@@ -48,11 +53,15 @@ func HandleCreateHold(svc HoldCreator) http.HandlerFunc {
 		hold, err := svc.CreateHold(r.Context(), app.CreateHoldInput{
 			EventID:        req.EventID,
 			ZoneID:         req.ZoneID,
+			UserID:         session.User.ID,
 			Quantity:       req.Quantity,
 			IdempotencyKey: req.IdempotencyKey,
 		})
 		if err != nil {
 			switch err {
+			case domain.ErrUnauthorized:
+				writeError(w, http.StatusUnauthorized, codeUnauthorized, err.Error())
+				return
 			case domain.ErrInvalidQuantity:
 				writeError(w, http.StatusBadRequest, codeInvalidQuantity, err.Error())
 				return

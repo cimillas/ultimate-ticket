@@ -4,11 +4,11 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const rootDir = fileURLToPath(new URL('.', import.meta.url));
-  const env = loadEnv(mode, '..', '');
+  const env = loadEnv(mode, rootDir, '');
   const port = Number(env.FRONTEND_PORT || 5173);
 
   return {
-    envDir: '..',
+    envDir: rootDir,
     server: {
       port,
     },

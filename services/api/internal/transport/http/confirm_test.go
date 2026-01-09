@@ -34,6 +34,7 @@ func TestHandleConfirmHold(t *testing.T) {
 		name           string
 		path           string
 		idempotencyKey string
+		withAuth       bool
 		result         app.ConfirmHoldResult
 		serviceErr     error
 		expectedStatus int
@@ -43,6 +44,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "created",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			result:         app.ConfirmHoldResult{Order: order, Created: true},
 			expectedStatus: http.StatusCreated,
 			expectedSubstr: `"hold_id":"hold-1"`,
@@ -51,6 +53,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "idempotent",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			result:         app.ConfirmHoldResult{Order: order, Created: false},
 			expectedStatus: http.StatusOK,
 		},
@@ -58,6 +61,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "uses order status",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-2",
+			withAuth:       true,
 			result:         app.ConfirmHoldResult{Order: refundedOrder, Created: false},
 			expectedStatus: http.StatusOK,
 			expectedSubstr: `"status":"refunded"`,
@@ -65,12 +69,22 @@ func TestHandleConfirmHold(t *testing.T) {
 		{
 			name:           "missing idempotency header",
 			path:           "/holds/hold-1/confirm",
+			withAuth:       true,
 			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "missing auth",
+			path:           "/holds/hold-1/confirm",
+			idempotencyKey: "idem-1",
+			withAuth:       false,
+			expectedStatus: http.StatusUnauthorized,
+			expectedSubstr: `"code":"unauthorized"`,
 		},
 		{
 			name:           "hold not found",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			serviceErr:     domain.ErrHoldNotFound,
 			expectedStatus: http.StatusNotFound,
 		},
@@ -78,6 +92,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "invalid id",
 			path:           "/holds/not-a-uuid/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			serviceErr:     domain.ErrInvalidID,
 			expectedStatus: http.StatusNotFound,
 		},
@@ -85,6 +100,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "hold expired",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			serviceErr:     domain.ErrHoldExpired,
 			expectedStatus: http.StatusConflict,
 		},
@@ -92,6 +108,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "event closed",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			serviceErr:     domain.ErrEventClosed,
 			expectedStatus: http.StatusConflict,
 			expectedSubstr: `"code":"event_closed"`,
@@ -100,6 +117,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "event cancelled",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			serviceErr:     domain.ErrEventCancelled,
 			expectedStatus: http.StatusConflict,
 			expectedSubstr: `"code":"event_cancelled"`,
@@ -108,6 +126,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "hold invalid",
 			path:           "/holds/hold-1/confirm",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			serviceErr:     domain.ErrHoldInvalid,
 			expectedStatus: http.StatusConflict,
 			expectedSubstr: `"code":"hold_invalid"`,
@@ -116,6 +135,7 @@ func TestHandleConfirmHold(t *testing.T) {
 			name:           "invalid path",
 			path:           "/holds/hold-1",
 			idempotencyKey: "idem-1",
+			withAuth:       true,
 			expectedStatus: http.StatusNotFound,
 		},
 	}
@@ -130,6 +150,9 @@ func TestHandleConfirmHold(t *testing.T) {
 			}
 
 			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			if tt.withAuth {
+				req = withAuth(req, "user-1")
+			}
 			if tt.idempotencyKey != "" {
 				req.Header.Set(idempotencyHeader, tt.idempotencyKey)
 			}

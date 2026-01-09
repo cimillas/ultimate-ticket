@@ -27,6 +27,7 @@ func TestHandleCreateHold(t *testing.T) {
 	tests := []struct {
 		name           string
 		body           string
+		withAuth       bool
 		serviceErr     error
 		expectedStatus int
 		expectedSubstr string
@@ -34,51 +35,67 @@ func TestHandleCreateHold(t *testing.T) {
 		{
 			name:           "success",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":2,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			expectedStatus: http.StatusCreated,
 			expectedSubstr: `"id":"hold-123"`,
 		},
 		{
+			name:           "missing auth",
+			body:           `{"event_id":"e1","zone_id":"z1","quantity":2,"idempotency_key":"k1"}`,
+			withAuth:       false,
+			expectedStatus: http.StatusUnauthorized,
+			expectedSubstr: `"code":"unauthorized"`,
+		},
+		{
 			name:           "invalid json",
 			body:           `{"event_id":`,
+			withAuth:       true,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "missing idempotency",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":2}`,
+			withAuth:       true,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "invalid quantity",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":0,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "zone not found",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			serviceErr:     domain.ErrZoneNotFound,
 			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name:           "invalid id",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			serviceErr:     domain.ErrInvalidID,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "idempotency conflict",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			serviceErr:     domain.ErrIdempotencyConflict,
 			expectedStatus: http.StatusConflict,
 		},
 		{
 			name:           "insufficient capacity",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			serviceErr:     domain.ErrInsufficientCapacity,
 			expectedStatus: http.StatusConflict,
 		},
 		{
 			name:           "event closed",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			serviceErr:     domain.ErrEventClosed,
 			expectedStatus: http.StatusConflict,
 			expectedSubstr: `"code":"event_closed"`,
@@ -86,6 +103,7 @@ func TestHandleCreateHold(t *testing.T) {
 		{
 			name:           "event cancelled",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			serviceErr:     domain.ErrEventCancelled,
 			expectedStatus: http.StatusConflict,
 			expectedSubstr: `"code":"event_cancelled"`,
@@ -93,6 +111,7 @@ func TestHandleCreateHold(t *testing.T) {
 		{
 			name:           "internal error",
 			body:           `{"event_id":"e1","zone_id":"z1","quantity":1,"idempotency_key":"k1"}`,
+			withAuth:       true,
 			serviceErr:     errors.New("boom"),
 			expectedStatus: http.StatusInternalServerError,
 		},
@@ -107,6 +126,9 @@ func TestHandleCreateHold(t *testing.T) {
 				err:  tt.serviceErr,
 			}
 			req := httptest.NewRequest(http.MethodPost, "/holds", bytes.NewBufferString(tt.body))
+			if tt.withAuth {
+				req = withAuth(req, "user-1")
+			}
 			rec := httptest.NewRecorder()
 
 			handler := HandleCreateHold(svc)
@@ -124,6 +146,16 @@ func TestHandleCreateHold(t *testing.T) {
 			}
 		})
 	}
+}
+
+func withAuth(req *http.Request, userID string) *http.Request {
+	session := AuthSession{
+		User: domain.User{
+			ID:   userID,
+			Role: domain.UserRoleUser,
+		},
+	}
+	return req.WithContext(WithAuth(req.Context(), session))
 }
 
 type stubHoldService struct {

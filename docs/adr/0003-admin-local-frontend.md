@@ -1,4 +1,4 @@
-# ADR 0003: Admin endpoints, CORS, shared env, and local frontend
+# ADR 0003: Admin endpoints, CORS, env configuration, and local frontend
 
 ## Status
 Accepted
@@ -30,14 +30,21 @@ We will:
    - Add a middleware that reads `CORS_ORIGINS` (comma-separated).
    - Only allowed origins receive CORS headers; others are rejected for preflight.
 
-3. **Use a shared `.env` file for backend and frontend**
-   - Define `PORT`, `DATABASE_URL`, `CORS_ORIGINS`, `VITE_API_BASE_URL`, and `FRONTEND_PORT`.
-   - Configure Vite to read the repo root `.env` so both apps share the same file.
+3. **Use separate `.env` files for backend and frontend**
+   - Backend: `services/api/.env` for `PORT`, `DATABASE_URL`, `CORS_ORIGINS`, etc.
+   - Frontend: `frontend/.env` for `VITE_API_BASE_URL` and `FRONTEND_PORT`.
 
 4. **Create a minimal Vite + Vanilla JS frontend**
    - No UX work; just forms for admin/event/zone creation and hold flows.
    - Split the UI into a console (`/`) and a local admin view (`/admin`).
    - Intended for local use only.
+
+## Update (2026-01-08)
+We split environment files to reduce coupling and keep each app focused (replacing
+the earlier shared `.env` approach):
+- Backend config lives in `services/api/.env` (copy from `services/api/.env.example`).
+- Frontend config lives in `frontend/.env` (copy from `frontend/.env.example`).
+Vite now reads the frontend `.env`, and local scripts load the backend `.env` for admin credentials.
 
 ## Consequences
 

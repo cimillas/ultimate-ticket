@@ -19,6 +19,8 @@ go.work.sum
 # Local env/config
 .env
 .env.*
+!.env.example
+!**/.env.example
 
 # Local caches
 .cache/

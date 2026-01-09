@@ -11,7 +11,7 @@ import (
 type HoldRepository interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
 	GetZoneForUpdate(ctx context.Context, eventID, zoneID string) (domain.Zone, time.Time, domain.EventStatus, error)
-	FindHoldByIdempotencyKey(ctx context.Context, eventID, zoneID, key string) (*domain.Hold, error)
+	FindHoldByIdempotencyKey(ctx context.Context, eventID, zoneID, userID, key string) (*domain.Hold, error)
 	SumActiveHolds(ctx context.Context, eventID, zoneID string, now time.Time) (int, error)
 	SumConfirmed(ctx context.Context, eventID, zoneID string) (int, error)
 	CreateHold(ctx context.Context, hold domain.Hold) error
@@ -52,6 +52,7 @@ func WithHoldTTL(d time.Duration) HoldServiceOption {
 type CreateHoldInput struct {
 	EventID        string
 	ZoneID         string
+	UserID         string
 	Quantity       int
 	IdempotencyKey string
 }
@@ -59,6 +60,9 @@ type CreateHoldInput struct {
 func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domain.Hold, error) {
 	if in.Quantity <= 0 {
 		return domain.Hold{}, domain.ErrInvalidQuantity
+	}
+	if in.UserID == "" {
+		return domain.Hold{}, domain.ErrUnauthorized
 	}
 	if in.IdempotencyKey == "" {
 		return domain.Hold{}, domain.ErrIdempotencyKeyRequired
@@ -69,7 +73,7 @@ func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domai
 	var eventErr error
 
 	err := s.repo.WithTx(ctx, func(txCtx context.Context) error {
-		if existing, err := s.repo.FindHoldByIdempotencyKey(txCtx, in.EventID, in.ZoneID, in.IdempotencyKey); err != nil {
+		if existing, err := s.repo.FindHoldByIdempotencyKey(txCtx, in.EventID, in.ZoneID, in.UserID, in.IdempotencyKey); err != nil {
 			return err
 		} else if existing != nil {
 			if existing.Quantity != in.Quantity {
@@ -119,6 +123,7 @@ func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domai
 			ID:             newUUID(),
 			EventID:        in.EventID,
 			ZoneID:         in.ZoneID,
+			UserID:         in.UserID,
 			Quantity:       in.Quantity,
 			Status:         domain.HoldStatusActive,
 			ExpiresAt:      now.Add(s.holdTTL),
@@ -129,7 +134,7 @@ func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domai
 		if err := s.repo.CreateHold(txCtx, hold); err != nil {
 			// Re-read on conflict to keep idempotent retries consistent under concurrency.
 			if err == domain.ErrIdempotencyConflict {
-				existing, err := s.repo.FindHoldByIdempotencyKey(txCtx, in.EventID, in.ZoneID, in.IdempotencyKey)
+				existing, err := s.repo.FindHoldByIdempotencyKey(txCtx, in.EventID, in.ZoneID, in.UserID, in.IdempotencyKey)
 				if err != nil {
 					return err
 				}

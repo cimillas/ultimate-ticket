@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 This project follows Semantic Versioning (SemVer).
 
 ## [Unreleased]
+## [0.5.0]
+- Added hold ownership (user_id) and enforced ownership on confirmations.
+- Scoped hold idempotency per user and added migration/backfill for legacy holds.
+- Added ADR 0010 documenting hold ownership and idempotency scope.
+- Split backend and frontend env files with new examples and config updates.
+- Added documentation index (`docs/README.md`) and updated references.
 
 ## [0.4.1]
 - Added service boundaries ADR and extraction readiness docs.

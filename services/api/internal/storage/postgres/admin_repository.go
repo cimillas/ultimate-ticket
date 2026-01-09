@@ -258,7 +258,7 @@ func (r *AdminRepository) ListActiveHoldsByZone(ctx context.Context, eventID, zo
 	}
 
 	const query = `
-SELECT id, event_id, zone_id, quantity, status, expires_at, idempotency_key, created_at
+SELECT id, event_id, zone_id, user_id, quantity, status, expires_at, idempotency_key, created_at
 FROM holds
 WHERE event_id = $1 AND zone_id = $2 AND status = 'active' AND expires_at > $3
 ORDER BY created_at ASC`
@@ -276,6 +276,7 @@ ORDER BY created_at ASC`
 			&hold.ID,
 			&hold.EventID,
 			&hold.ZoneID,
+			&hold.UserID,
 			&hold.Quantity,
 			&status,
 			&hold.ExpiresAt,

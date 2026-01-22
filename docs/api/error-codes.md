@@ -4,8 +4,10 @@
 All error responses are JSON with a stable code:
 
 ```json
-{"error":"<message>","code":"<code>"}
+{"error":"<message>","code":"<code>","request_id":"<id>"}
 ```
+
+`request_id` is omitted when unavailable.
 
 ## Code reference
 - `method_not_allowed` - HTTP method is not supported for the endpoint.

@@ -38,14 +38,16 @@ API (default config)
   - `DATABASE_URL` (default: `postgres://ultimate_ticket:ultimate_ticket@localhost:5432/ultimate_ticket?sslmode=disable`)
   - `CORS_ORIGINS` (comma-separated, e.g. `http://localhost:5173`)
   - `SESSION_TTL` (default: `1h`)
+  - `SERVICE_NAME` (default: `api`, used in request logs)
   - `ADMIN_USERNAME` (used by auth bootstrap/reset)
   - `ADMIN_PASSWORD` (used by auth bootstrap/reset)
   - `ADMIN_EMAIL` (used by auth bootstrap/reset)
   - `SESSION_COOKIE_SECURE` (default: `false` in `APP_ENV=local`, `true` otherwise)
   - `ALLOW_PUBLIC_REGISTER` (default: `true` in `APP_ENV=local`, `false` otherwise)
-- Endpoints:
-  - `GET /health` → `ok`
-  - Auth:
+  - Endpoints:
+    - `GET /health` → `ok`
+    - `GET /metrics` → Prometheus metrics
+    - Auth:
     - `POST /auth/register` with JSON `{username, email, password}`
     - `POST /auth/login` with JSON `{identifier, password}`
     - `POST /auth/logout`
@@ -188,7 +190,7 @@ Expected response (200):
 
 Error format:
 ```json
-{"error":"<message>","code":"<code>"}
+{"error":"<message>","code":"<code>","request_id":"<id>"}
 ```
 
 Full reference: `docs/api/error-codes.md`
@@ -198,7 +200,7 @@ Logging:
 - `request_id` is taken from `X-Request-Id` or generated if missing; the response echoes `X-Request-Id`.
 Example:
 ```json
-{"ts":"2026-01-07T22:49:06Z","request_id":"7b6c2d...","method":"GET","path":"/events","status":200,"duration_ms":12,"bytes":123,"remote_ip":"127.0.0.1:54321","user_agent":"curl/8.1.0"}
+{"ts":"2026-01-07T22:49:06Z","request_id":"7b6c2d...","service":"api","method":"GET","path":"/events","status":200,"duration_ms":12,"bytes":123,"remote_ip":"127.0.0.1:54321","user_agent":"curl/8.1.0"}
 ```
 
 ## Frontend (local)

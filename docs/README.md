@@ -21,6 +21,7 @@
 
 ## Observability
 - `observability/plan.md` for logging and future metrics.
+- `observability/metrics.md` for current Prometheus metrics.
 
 ## Roadmaps
 - `roadmap.md` for product milestones.

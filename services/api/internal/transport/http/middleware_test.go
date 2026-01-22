@@ -24,6 +24,20 @@ func decodeLogEntry(t *testing.T, buf *bytes.Buffer) requestLogEntry {
 	return entry
 }
 
+func decodeLogFields(t *testing.T, buf *bytes.Buffer) map[string]any {
+	t.Helper()
+
+	line := strings.TrimSpace(buf.String())
+	if line == "" {
+		t.Fatalf("expected log output")
+	}
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		t.Fatalf("decode log json: %v", err)
+	}
+	return entry
+}
+
 func TestRequestLogger_LogsStatusAndPath(t *testing.T) {
 	t.Parallel()
 
@@ -138,5 +152,30 @@ func TestRequestLogger_LogsRequestIDAndBytes(t *testing.T) {
 	}
 	if entry.Bytes != 5 {
 		t.Fatalf("expected bytes 5, got %d", entry.Bytes)
+	}
+}
+
+func TestRequestLogger_LogsServiceName(t *testing.T) {
+	t.Setenv("SERVICE_NAME", "api-test")
+
+	buf := &bytes.Buffer{}
+	logger := log.New(buf, "", 0)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+
+	RequestID(RequestLogger(handler, logger)).ServeHTTP(rec, req)
+
+	fields := decodeLogFields(t, buf)
+	service, ok := fields["service"].(string)
+	if !ok || service == "" {
+		t.Fatalf("expected service field to be set")
+	}
+	if service != "api-test" {
+		t.Fatalf("expected service api-test, got %q", service)
 	}
 }

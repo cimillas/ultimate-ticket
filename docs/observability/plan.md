@@ -30,9 +30,16 @@ This is a design plan only; implementation will follow later.
    - `/health` stays, but should include dependency status when extracted
      (DB, downstream auth service).
 
+## Current implementation (monolith)
+- Request IDs are generated and returned via `X-Request-Id` and included in logs.
+- Logs are JSON per line and include `service` via `SERVICE_NAME` (default `api`).
+- Prometheus metrics are exposed at `/metrics` (request count + duration).
+  See `docs/observability/metrics.md` for details.
+- Error responses include `request_id` when available.
+
 ## Decisions needed (non-trivial)
 1) **Metrics format**
-   - Option A (recommended): Prometheus `/metrics`.
+   - Option A (approved): Prometheus `/metrics`.
    - Option B: OpenTelemetry metrics (heavier; better for vendor-neutral stacks).
 
 2) **Tracing**

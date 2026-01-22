@@ -44,6 +44,7 @@ Alternatives:
 Script:
 - `scripts/e2e/run.sh` runs the critical flows using curl.
 - Requires the API to be running locally and `ALLOW_PUBLIC_REGISTER=true`.
+- The runner does not start the API; launch it first (for example `make backend-run`).
 - Optional: set `E2E_RESET_AUTH=1` to reset auth tables for a clean admin login (local only).
 
 ## Critical scenarios
@@ -113,4 +114,5 @@ Then:
 - Observability logs include `request_id` for each request.
 
 ## Next step
-Implement a minimal bash-based runner under `scripts/e2e/` once the plan is accepted.
+The bash-based runner is available at `scripts/e2e/run.sh`.
+Keep the plan and script in sync as flows evolve.

@@ -1,12 +1,14 @@
 # AGENTS.md — AI-assisted development guide
 
 This repository is developed with AI assistance. The AI acts as a guided pair-programmer, not an autonomous developer.
+These rules are model-agnostic and apply to any AI agent or tool used in this repo.
 
 ## 0) Operating mode: guided, not automatic
 - The AI MUST propose a plan before making non-trivial changes.
 - The AI MUST wait for explicit developer approval for any **non-trivial decision** (see section 8).
 - The AI SHOULD prefer small, reviewable diffs and incremental progress.
 - If uncertain, the AI MUST ask rather than guess.
+- Avoid assuming any specific AI provider, API, or interface when following these rules.
 
 ## 1) Project goals (high level)
 Build a high-scale ticketing prototype focused on:
@@ -43,6 +45,7 @@ During development we run dependencies via Docker.
 - Lint (if configured): `cd services/api && golangci-lint run`
 Alternative from repo root:
 - Run tests (backend + frontend): `make test`
+- E2E tests require the API to already be running; the E2E script does not start it.
 - Run backend tests: `make backend-test`
 - Run frontend tests: `make frontend-test`
 - Run API: `make backend-run` (alias: `make run`)

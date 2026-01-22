@@ -69,4 +69,4 @@ existing contracts or slowing delivery.
 - **Operational overhead**: delay extraction until metrics/logs ready.
 
 ## Next step
-After approval, create the Phase 1 checklist and track its completion.
+Use `docs/microservices/phase-1-checklist.md` to track Phase 1 completion.

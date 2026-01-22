@@ -12,7 +12,7 @@ extraction to avoid cascading changes.
 
 2) **Request/response shapes**
    - JSON fields and types.
-   - Error payload schema: `{"error":"...","code":"..."}`.
+   - Error payload schema: `{"error":"...","code":"...","request_id":"..."}`.
    - Auth response schema (`user`, `expires_at`).
 
 3) **Auth semantics**
@@ -26,7 +26,7 @@ extraction to avoid cascading changes.
 
 5) **Domain states**
    - Event: `active`, `closed`, `cancelled`.
-   - Hold: `active`, `confirmed`, `invalid`.
+   - Hold: `active`, `confirmed`, `expired`, `invalid`.
    - Order: `confirmed`, `refunded`.
 
 6) **Time rules**

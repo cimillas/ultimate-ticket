@@ -21,7 +21,7 @@ A temporary reservation of `quantity` tickets in a zone. Holds have a TTL
 (`expires_at`) and prevent overselling while a customer completes checkout.
 Holds are owned by the authenticated user and are created with an idempotency
 key scoped to that user. Holds are blocked once an event is closed or cancelled.
-Cancelled events invalidate active holds.
+Cancelled events invalidate active holds and mark confirmed holds invalid as part of refunds.
 
 ## Confirmation (Order)
 A confirmation turns an active hold into a finalized purchase. It is idempotent

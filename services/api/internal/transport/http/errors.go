@@ -42,20 +42,31 @@ const (
 )
 
 type errorResponse struct {
-	Error string `json:"error"`
-	Code  string `json:"code"`
+	Error     string `json:"error"`
+	Code      string `json:"code"`
+	RequestID string `json:"request_id,omitempty"`
 }
 
 func writeError(w http.ResponseWriter, status int, code, msg string) {
+	requestID := ""
+	if getter, ok := w.(interface{ RequestID() string }); ok {
+		requestID = getter.RequestID()
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	payload, err := json.Marshal(errorResponse{
-		Error: msg,
-		Code:  code,
+		Error:     msg,
+		Code:      code,
+		RequestID: requestID,
 	})
 	if err != nil {
-		_, _ = w.Write([]byte(`{"error":"internal error","code":"internal_error"}`))
+		if requestID == "" {
+			_, _ = w.Write([]byte(`{"error":"internal error","code":"internal_error"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"error":"internal error","code":"internal_error","request_id":"` + requestID + `"}`))
 		return
 	}
 	_, _ = w.Write(payload)

@@ -10,6 +10,9 @@ Source of truth for error codes: `docs/api/error-codes.md`.
 - `GET /health`
   - Response: `ok` (text)
 
+- `GET /metrics`
+  - Response: Prometheus metrics (text)
+
 - `GET /events`
   - Response: JSON array of events
 
@@ -27,7 +30,7 @@ Source of truth for error codes: `docs/api/error-codes.md`.
   - Notes: `identifier` is email if it contains `@`, otherwise username
 
 - `POST /auth/logout`
-  - Requires session cookie
+  - Uses session cookie when present; returns ok even if missing
 
 - `POST /auth/password`
   - Requires session cookie
@@ -71,7 +74,7 @@ Source of truth for error codes: `docs/api/error-codes.md`.
 - `Idempotency-Key` (required only for `POST /holds/{id}/confirm`)
 
 ## Error contract
-- Error payload: `{"error":"<message>","code":"<code>"}`
+- Error payload: `{"error":"<message>","code":"<code>","request_id":"<id>"}` (request_id optional)
 - Status codes and error codes are documented in `docs/api/error-codes.md`.
 
 ## Notes

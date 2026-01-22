@@ -86,6 +86,7 @@ func main() {
 	adminSvc := app.NewAdminService(adminRepo, clock.NewSystem())
 	authRepo := postgres.NewAuthRepository(pool)
 	authSvc := app.NewAuthService(authRepo, clock.NewSystem(), sessionTTL)
+	metrics := transporthttp.NewMetrics(nil)
 
 	cookieCfg := transporthttp.SessionCookieConfig{
 		Name:     defaultSessionCookieName,
@@ -96,6 +97,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", transporthttp.HealthHandler)
+	mux.Handle("/metrics", metrics.Handler())
 	mux.Handle("/events", transporthttp.HandleEvents(adminSvc))
 	mux.Handle("/events/", transporthttp.HandleEventZones(adminSvc))
 	mux.Handle("/auth/register", transporthttp.HandleRegister(authSvc, cookieCfg, allowRegister))
@@ -111,7 +113,12 @@ func main() {
 	mux.Handle("/", transporthttp.NotFoundHandler())
 
 	corsOrigins := parseCSV(corsEnv)
-	handler := transporthttp.RequestID(transporthttp.RequestLogger(transporthttp.CORS(corsOrigins, mux), logger))
+	handler := transporthttp.RequestID(
+		transporthttp.RequestLogger(
+			metrics.Middleware(transporthttp.CORS(corsOrigins, mux)),
+			logger,
+		),
+	)
 
 	server := &http.Server{
 		Addr:    ":" + port,

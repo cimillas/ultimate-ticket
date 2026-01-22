@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 This project follows Semantic Versioning (SemVer).
 
 ## [Unreleased]
+- Added Prometheus `/metrics` endpoint with request count and duration metrics.
+- Added `service` field in request logs with `SERVICE_NAME` env support.
+- Added `request_id` to error responses when available.
+- Updated observability and API docs, including metrics reference and Phase 1 checklist tracking.
 
 ## [0.6.0]
 - Added user-scoped orders endpoint (`GET /orders`) with hold context.

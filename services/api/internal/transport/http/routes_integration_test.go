@@ -50,6 +50,25 @@ func TestMuxWiring_HoldsRequireAuth(t *testing.T) {
 	}
 }
 
+func TestMuxWiring_OrdersRequireAuth(t *testing.T) {
+	mux, _, _ := newTestMux(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/orders", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+	var errResp errorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if errResp.Code != codeUnauthorized {
+		t.Fatalf("expected code %s, got %s", codeUnauthorized, errResp.Code)
+	}
+}
+
 func TestMuxWiring_AdminRequiresAdmin(t *testing.T) {
 	mux, authSvc, cookieCfg := newTestMux(t)
 
@@ -130,6 +149,7 @@ func newTestMux(t *testing.T) (http.Handler, *app.AuthService, SessionCookieConf
 	mux.Handle("/events/", HandleEventZones(adminSvc))
 	mux.Handle("/holds", RequireAuth(authSvc, cookieCfg, HandleCreateHold(holdSvc)))
 	mux.Handle("/holds/", RequireAuth(authSvc, cookieCfg, HandleConfirmHold(orderSvc)))
+	mux.Handle("/orders", RequireAuth(authSvc, cookieCfg, HandleOrders(orderSvc)))
 	mux.Handle("/admin/events", RequireAuth(authSvc, cookieCfg, RequireAdmin(HandleAdminEvents(adminSvc))))
 	mux.Handle("/admin/events/", RequireAuth(authSvc, cookieCfg, RequireAdmin(HandleAdminZones(adminSvc))))
 

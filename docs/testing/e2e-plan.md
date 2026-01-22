@@ -44,6 +44,7 @@ Alternatives:
 Script:
 - `scripts/e2e/run.sh` runs the critical flows using curl.
 - Requires the API to be running locally and `ALLOW_PUBLIC_REGISTER=true`.
+- Optional: set `E2E_RESET_AUTH=1` to reset auth tables for a clean admin login (local only).
 
 ## Critical scenarios
 

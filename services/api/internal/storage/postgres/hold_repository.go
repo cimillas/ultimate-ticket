@@ -67,6 +67,44 @@ WHERE event_id = $1 AND zone_id = $2 AND user_id = $3 AND idempotency_key = $4`
 	return &h, nil
 }
 
+func (r *HoldRepository) ListActiveHoldsByUser(ctx context.Context, userID string, now time.Time) ([]domain.Hold, error) {
+	const query = `
+SELECT id, event_id, zone_id, user_id, quantity, status, expires_at, idempotency_key, created_at
+FROM holds
+WHERE user_id = $1 AND status = 'active' AND expires_at > $2
+ORDER BY created_at`
+
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if tx := txFromContext(ctx); tx != nil {
+		rows, err = tx.Query(ctx, query, userID, now)
+	} else {
+		rows, err = r.pool.Query(ctx, query, userID, now)
+	}
+	if err != nil {
+		if isInvalidUUID(err) {
+			return nil, domain.ErrInvalidID
+		}
+		return nil, fmt.Errorf("list active holds by user: %w", err)
+	}
+	defer rows.Close()
+
+	holds := []domain.Hold{}
+	for rows.Next() {
+		var h domain.Hold
+		if err := rows.Scan(&h.ID, &h.EventID, &h.ZoneID, &h.UserID, &h.Quantity, &h.Status, &h.ExpiresAt, &h.IdempotencyKey, &h.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan hold: %w", err)
+		}
+		holds = append(holds, h)
+	}
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("list active holds by user: %w", rows.Err())
+	}
+	return holds, nil
+}
+
 func (r *HoldRepository) SumActiveHolds(ctx context.Context, eventID, zoneID string, now time.Time) (int, error) {
 	const query = `
 SELECT COALESCE(SUM(quantity), 0)

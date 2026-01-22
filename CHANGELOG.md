@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 This project follows Semantic Versioning (SemVer).
 
 ## [Unreleased]
+
+## [0.6.0]
+- Added user-scoped orders endpoint (`GET /orders`) with hold context.
+- Added password change endpoint (`POST /auth/password`) that keeps the current session and invalidates others.
+- Updated frontend labels to “Dashboard” and added “My activity” + “Account” sections.
+- Expanded E2E script to cover user holds/orders, password change, and optional auth reset (`E2E_RESET_AUTH=1`).
+- Updated API docs, error codes, and examples for new endpoints.
 ## [0.5.0]
 - Added hold ownership (user_id) and enforced ownership on confirmations.
 - Scoped hold idempotency per user and added migration/backfill for legacy holds.

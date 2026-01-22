@@ -11,6 +11,7 @@ import (
 
 	"github.com/cimillas/ultimate-ticket/services/api/internal/app"
 	"github.com/cimillas/ultimate-ticket/services/api/internal/clock"
+	"github.com/cimillas/ultimate-ticket/services/api/internal/domain"
 	"github.com/cimillas/ultimate-ticket/services/api/internal/storage/postgres"
 	"github.com/cimillas/ultimate-ticket/services/api/internal/testutil"
 )
@@ -101,6 +102,50 @@ func TestAuthRegisterAndMe_HTTPIntegration(t *testing.T) {
 	}
 	if meResp.User.ID != registerResp.User.ID {
 		t.Fatalf("expected same user id, got %s", meResp.User.ID)
+	}
+}
+
+func TestAuthChangePassword_HTTPIntegration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	testutil.ApplyMigrations(t, context.Background(), pool)
+
+	repo := postgres.NewAuthRepository(pool)
+	clk := clock.NewFixed(time.Date(2025, 1, 6, 9, 0, 0, 0, time.UTC))
+	svc := app.NewAuthService(repo, clk, time.Hour)
+
+	ctx := context.Background()
+	testutil.TruncateAll(t, ctx, pool)
+
+	authResult, err := svc.Register(ctx, app.RegisterInput{
+		Username: "ana",
+		Email:    "ana@example.com",
+		Password: "old-secret",
+	})
+	if err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+
+	cookieCfg := SessionCookieConfig{Name: "ut_session"}
+	handler := RequireAuth(svc, cookieCfg, HandleChangePassword(svc, cookieCfg))
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/password",
+		bytes.NewBufferString(`{"current_password":"old-secret","new_password":"new-secret"}`),
+	)
+	req.AddCookie(&http.Cookie{Name: "ut_session", Value: authResult.SessionToken})
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	_, err = svc.Login(ctx, app.LoginInput{Identifier: "ana", Password: "new-secret"})
+	if err != nil {
+		t.Fatalf("expected login with new password, got %v", err)
+	}
+	_, err = svc.Login(ctx, app.LoginInput{Identifier: "ana", Password: "old-secret"})
+	if err != domain.ErrInvalidCredentials {
+		t.Fatalf("expected old password to fail, got %v", err)
 	}
 }
 

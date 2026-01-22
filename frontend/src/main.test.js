@@ -28,10 +28,20 @@ const setupDOM = () => {
       <button type="submit">Create</button>
     </form>
     <form id="confirm-hold">
-      <input name="hold_id" />
+      <div data-hold-picker>
+        <input name="hold_id" />
+        <div data-hold-dropdown hidden></div>
+      </div>
       <input name="idempotency_key" />
       <button id="regen-confirm-key" type="button">Regenerate</button>
       <button type="submit">Confirm</button>
+    </form>
+    <button id="list-my-holds" type="button">List my holds</button>
+    <button id="list-my-orders" type="button">List my orders</button>
+    <form id="change-password">
+      <input name="current_password" />
+      <input name="new_password" />
+      <button type="submit">Update password</button>
     </form>
     <pre id="output"></pre>
   `;
@@ -161,5 +171,62 @@ describe('main.js', () => {
     expect(url).toBe('http://localhost:8080/holds/hold-9/confirm');
     expect(options.method).toBe('POST');
     expect(options.headers['Idempotency-Key']).toBe('confirm-key');
+  });
+
+  it('lists active holds on click', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      status: 200,
+      text: async () => JSON.stringify([]),
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await loadMain();
+
+    document.getElementById('list-my-holds').click();
+    await flushPromises();
+
+    const call = fetchSpy.mock.calls.find((entry) => entry[0].endsWith('/holds'));
+    expect(call).not.toBeUndefined();
+    expect(call[1]?.method).toBeUndefined();
+  });
+
+  it('lists orders on click', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      status: 200,
+      text: async () => JSON.stringify([]),
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await loadMain();
+
+    document.getElementById('list-my-orders').click();
+    await flushPromises();
+
+    const call = fetchSpy.mock.calls.find((entry) => entry[0].endsWith('/orders'));
+    expect(call).not.toBeUndefined();
+    expect(call[1]?.method).toBeUndefined();
+  });
+
+  it('posts a password change request', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      status: 200,
+      text: async () => JSON.stringify({ ok: true }),
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await loadMain();
+
+    const form = document.getElementById('change-password');
+    form.current_password.value = 'old';
+    form.new_password.value = 'new';
+    form.dispatchEvent(new Event('submit'));
+    await flushPromises();
+
+    const call = fetchSpy.mock.calls.find((entry) => entry[0].endsWith('/auth/password'));
+    expect(call).not.toBeUndefined();
+    const [, options] = call;
+    expect(options.method).toBe('POST');
+    const payload = JSON.parse(options.body);
+    expect(payload).toEqual({ current_password: 'old', new_password: 'new' });
   });
 });

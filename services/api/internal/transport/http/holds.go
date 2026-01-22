@@ -11,21 +11,55 @@ import (
 	"github.com/cimillas/ultimate-ticket/services/api/internal/domain"
 )
 
-// HoldCreator is the minimal interface needed to create a hold.
-type HoldCreator interface {
+// HoldService is the minimal interface needed to manage holds.
+type HoldService interface {
 	CreateHold(rctx context.Context, in app.CreateHoldInput) (domain.Hold, error)
+	ListActiveHoldsByUser(ctx context.Context, userID string) ([]domain.Hold, error)
 }
 
-// HandleCreateHold returns an HTTP handler for creating holds.
-func HandleCreateHold(svc HoldCreator) http.HandlerFunc {
+// HandleCreateHold returns an HTTP handler for creating and listing holds.
+func HandleCreateHold(svc HoldService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
-			return
-		}
 		session, ok := AuthFromContext(r.Context())
 		if !ok {
 			writeError(w, http.StatusUnauthorized, codeUnauthorized, domain.ErrUnauthorized.Error())
+			return
+		}
+
+		if r.Method == http.MethodGet {
+			holds, err := svc.ListActiveHoldsByUser(r.Context(), session.User.ID)
+			if err != nil {
+				switch err {
+				case domain.ErrUnauthorized:
+					writeError(w, http.StatusUnauthorized, codeUnauthorized, err.Error())
+				case domain.ErrInvalidID:
+					writeError(w, http.StatusBadRequest, codeInvalidID, err.Error())
+				default:
+					writeError(w, http.StatusInternalServerError, codeInternalError, "internal error")
+				}
+				return
+			}
+
+			resp := make([]listHoldResponse, 0, len(holds))
+			for _, hold := range holds {
+				resp = append(resp, listHoldResponse{
+					ID:        hold.ID,
+					EventID:   hold.EventID,
+					ZoneID:    hold.ZoneID,
+					Quantity:  hold.Quantity,
+					Status:    string(hold.Status),
+					ExpiresAt: hold.ExpiresAt,
+				})
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
 			return
 		}
 
@@ -128,6 +162,15 @@ func (r createHoldRequest) validate() error {
 
 type createHoldResponse struct {
 	ID        string    `json:"id"`
+	Status    string    `json:"status"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type listHoldResponse struct {
+	ID        string    `json:"id"`
+	EventID   string    `json:"event_id"`
+	ZoneID    string    `json:"zone_id"`
+	Quantity  int       `json:"quantity"`
 	Status    string    `json:"status"`
 	ExpiresAt time.Time `json:"expires_at"`
 }

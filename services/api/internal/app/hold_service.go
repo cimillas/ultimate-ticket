@@ -12,6 +12,7 @@ type HoldRepository interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
 	GetZoneForUpdate(ctx context.Context, eventID, zoneID string) (domain.Zone, time.Time, domain.EventStatus, error)
 	FindHoldByIdempotencyKey(ctx context.Context, eventID, zoneID, userID, key string) (*domain.Hold, error)
+	ListActiveHoldsByUser(ctx context.Context, userID string, now time.Time) ([]domain.Hold, error)
 	SumActiveHolds(ctx context.Context, eventID, zoneID string, now time.Time) (int, error)
 	SumConfirmed(ctx context.Context, eventID, zoneID string) (int, error)
 	CreateHold(ctx context.Context, hold domain.Hold) error
@@ -160,4 +161,12 @@ func (s *HoldService) CreateHold(ctx context.Context, in CreateHoldInput) (domai
 	}
 
 	return result, nil
+}
+
+func (s *HoldService) ListActiveHoldsByUser(ctx context.Context, userID string) ([]domain.Hold, error) {
+	if userID == "" {
+		return nil, domain.ErrUnauthorized
+	}
+	now := s.clock.Now()
+	return s.repo.ListActiveHoldsByUser(ctx, userID, now)
 }

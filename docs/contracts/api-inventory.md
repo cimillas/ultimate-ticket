@@ -29,12 +29,22 @@ Source of truth for error codes: `docs/api/error-codes.md`.
 - `POST /auth/logout`
   - Requires session cookie
 
+- `POST /auth/password`
+  - Requires session cookie
+  - Body: `{ "current_password", "new_password" }`
+
 - `GET /me`
   - Requires session cookie
 
 ## Protected endpoints (session required)
 - `POST /holds`
   - Body: `{ "event_id", "zone_id", "quantity", "idempotency_key" }`
+
+- `GET /holds`
+  - Response: JSON array of active holds for the current user
+
+- `GET /orders`
+  - Response: JSON array of orders for the current user
 
 - `POST /holds/{id}/confirm`
   - Header: `Idempotency-Key: <string>`

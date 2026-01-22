@@ -17,6 +17,7 @@ type AuthService interface {
 	Login(ctx context.Context, in app.LoginInput) (app.AuthResult, error)
 	Authenticate(ctx context.Context, token string) (app.AuthSession, error)
 	Logout(ctx context.Context, token string) error
+	ChangePassword(ctx context.Context, in app.ChangePasswordInput) error
 }
 
 type SessionAuthenticator interface {
@@ -41,6 +42,10 @@ type loginRequest struct {
 	Password   string `json:"password"`
 }
 
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
 type authUserResponse struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
@@ -130,6 +135,46 @@ func HandleLogout(svc AuthService, cookieCfg SessionCookieConfig) http.HandlerFu
 		}
 
 		clearSessionCookie(w, cookieCfg)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	}
+}
+
+func HandleChangePassword(svc AuthService, cookieCfg SessionCookieConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
+			return
+		}
+		session, ok := AuthFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, codeUnauthorized, domain.ErrUnauthorized.Error())
+			return
+		}
+		token, ok := sessionTokenFromRequest(r, cookieCfg.Name)
+		if !ok {
+			writeError(w, http.StatusUnauthorized, codeUnauthorized, domain.ErrUnauthorized.Error())
+			return
+		}
+
+		var req changePasswordRequest
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, codeInvalidRequestBody, "invalid request body")
+			return
+		}
+
+		if err := svc.ChangePassword(r.Context(), app.ChangePasswordInput{
+			UserID:          session.User.ID,
+			CurrentPassword: req.CurrentPassword,
+			NewPassword:     req.NewPassword,
+			SessionToken:    token,
+		}); err != nil {
+			writeAuthError(w, err)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 	}

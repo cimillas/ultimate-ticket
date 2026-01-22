@@ -308,6 +308,45 @@ func TestHoldService_CreateHold(t *testing.T) {
 	})
 }
 
+func TestHoldService_ListActiveHoldsByUser(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2025, 1, 2, 12, 0, 0, 0, time.UTC)
+
+	t.Run("returns active, unexpired holds for the user", func(t *testing.T) {
+		userID := "user-1"
+		holds := []domain.Hold{
+			{ID: "hold-1", UserID: userID, Status: domain.HoldStatusActive, ExpiresAt: now.Add(5 * time.Minute)},
+			{ID: "hold-2", UserID: userID, Status: domain.HoldStatusActive, ExpiresAt: now.Add(-1 * time.Minute)},
+			{ID: "hold-3", UserID: userID, Status: domain.HoldStatusConfirmed, ExpiresAt: now.Add(5 * time.Minute)},
+			{ID: "hold-4", UserID: "user-2", Status: domain.HoldStatusActive, ExpiresAt: now.Add(5 * time.Minute)},
+		}
+		repo := newFakeHoldRepo(nil, holds, nil, nil, now.Add(1*time.Hour))
+		svc := NewHoldService(repo, clock.NewFixed(now))
+
+		active, err := svc.ListActiveHoldsByUser(context.Background(), userID)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(active) != 1 {
+			t.Fatalf("expected 1 hold, got %d", len(active))
+		}
+		if active[0].ID != "hold-1" {
+			t.Fatalf("expected hold-1, got %s", active[0].ID)
+		}
+	})
+
+	t.Run("missing user returns error", func(t *testing.T) {
+		repo := newFakeHoldRepo(nil, nil, nil, nil, now.Add(1*time.Hour))
+		svc := NewHoldService(repo, clock.NewFixed(now))
+
+		_, err := svc.ListActiveHoldsByUser(context.Background(), "")
+		if err != domain.ErrUnauthorized {
+			t.Fatalf("expected ErrUnauthorized, got %v", err)
+		}
+	})
+}
+
 type fakeHoldRepo struct {
 	zones             map[string]domain.Zone
 	holds             []domain.Hold
@@ -363,6 +402,23 @@ func (f *fakeHoldRepo) FindHoldByIdempotencyKey(_ context.Context, eventID, zone
 		}
 	}
 	return nil, nil
+}
+
+func (f *fakeHoldRepo) ListActiveHoldsByUser(_ context.Context, userID string, now time.Time) ([]domain.Hold, error) {
+	var result []domain.Hold
+	for _, h := range f.holds {
+		if h.UserID != userID {
+			continue
+		}
+		if h.Status != domain.HoldStatusActive {
+			continue
+		}
+		if !h.ExpiresAt.After(now) {
+			continue
+		}
+		result = append(result, h)
+	}
+	return result, nil
 }
 
 func (f *fakeHoldRepo) SumActiveHolds(_ context.Context, eventID, zoneID string, now time.Time) (int, error) {

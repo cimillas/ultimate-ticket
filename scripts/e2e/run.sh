@@ -7,6 +7,8 @@ set -euo pipefail
 # Notes:
 # - API must be running locally.
 # - Requires ADMIN_USERNAME/ADMIN_PASSWORD/ADMIN_EMAIL (loaded from services/api/.env).
+# - Bootstrap admin runs before E2E to ensure the user exists.
+# - Optional: set E2E_RESET_AUTH=1 to reset auth tables (local only).
 # - Optional: set API_BASE_URL or VITE_API_BASE_URL to target another host.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -37,6 +39,7 @@ API_BASE="${API_BASE_URL:-${VITE_API_BASE_URL:-http://localhost:8080}}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
+E2E_RESET_AUTH="${E2E_RESET_AUTH:-0}"
 
 if [[ -z "$ADMIN_USERNAME" || -z "$ADMIN_PASSWORD" || -z "$ADMIN_EMAIL" ]]; then
   echo "Missing ADMIN_USERNAME/ADMIN_PASSWORD/ADMIN_EMAIL in env."
@@ -125,6 +128,8 @@ USER_SUFFIX="$(date +%s)"
 USER_NAME="e2e-user-$USER_SUFFIX"
 USER_EMAIL="e2e-$USER_SUFFIX@example.com"
 USER_PASSWORD="secret"
+NEW_PASSWORD="new-secret"
+password_cookie="$tmp_dir/password.cookies"
 
 say "Auth: register"
 request "POST" "$API_BASE/auth/register" \
@@ -146,11 +151,24 @@ say "Auth: me"
 request "GET" "$API_BASE/me" "" "$user_cookie"
 expect_status "200"
 
+if [[ "$E2E_RESET_AUTH" == "1" ]]; then
+  say "Admin: reset auth"
+  (cd "$ROOT_DIR/services/api" && APP_ENV=local CONFIRM=YES go run ./cmd/authctl reset-auth >/dev/null)
+else
+  say "Admin: bootstrap"
+  (cd "$ROOT_DIR/services/api" && go run ./cmd/authctl bootstrap-admin >/dev/null)
+fi
+
 say "Admin: login"
 request "POST" "$API_BASE/auth/login" \
   "{\"identifier\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}" \
   "$admin_cookie"
-expect_status "200"
+if [[ "$http_status" != "200" ]]; then
+  if [[ "$http_status" == "401" && "$(extract code)" == "invalid_credentials" ]]; then
+    fail "admin login failed; set E2E_RESET_AUTH=1 or run APP_ENV=local CONFIRM=YES make backend-auth-reset"
+  fi
+  fail "expected status 200, got $http_status"
+fi
 
 say "Admin: create event"
 request "POST" "$API_BASE/admin/events" \
@@ -181,6 +199,13 @@ expect_status "201"
 HOLD_ID="$(extract id)"
 if [[ -z "$HOLD_ID" ]]; then
   fail "missing hold id"
+fi
+
+say "Holds: list active (user)"
+request "GET" "$API_BASE/holds" "" "$user_cookie"
+expect_status "200"
+if ! echo "$body" | grep -q "$HOLD_ID"; then
+  fail "expected active holds to include $HOLD_ID"
 fi
 
 say "Holds: idempotent retry"
@@ -217,6 +242,39 @@ request "POST" "$API_BASE/holds/$HOLD_ID/confirm" "" "$user_cookie" "Idempotency
 expect_status "409"
 expect_code "hold_already_confirmed"
 
+say "Orders: list (user)"
+request "GET" "$API_BASE/orders" "" "$user_cookie"
+expect_status "200"
+if ! echo "$body" | grep -q "$ORDER_ID"; then
+  fail "expected orders to include $ORDER_ID"
+fi
+
+say "Holds: list active (user, should be empty)"
+request "GET" "$API_BASE/holds" "" "$user_cookie"
+expect_status "200"
+if [[ "$(echo "$body" | tr -d '[:space:]')" != "[]" ]]; then
+  fail "expected no active holds after confirmation"
+fi
+
+say "Account: change password"
+request "POST" "$API_BASE/auth/password" \
+  "{\"current_password\":\"$USER_PASSWORD\",\"new_password\":\"$NEW_PASSWORD\"}" \
+  "$user_cookie"
+expect_status "200"
+
+say "Account: login with old password fails"
+request "POST" "$API_BASE/auth/login" \
+  "{\"identifier\":\"$USER_NAME\",\"password\":\"$USER_PASSWORD\"}" \
+  "$password_cookie"
+expect_status "401"
+expect_code "invalid_credentials"
+
+say "Account: login with new password works"
+request "POST" "$API_BASE/auth/login" \
+  "{\"identifier\":\"$USER_NAME\",\"password\":\"$NEW_PASSWORD\"}" \
+  "$password_cookie"
+expect_status "200"
+
 say "Cancel: create active hold"
 ACTIVE_KEY="$(gen_key)"
 request "POST" "$API_BASE/holds" \
@@ -226,6 +284,13 @@ expect_status "201"
 HOLD_ACTIVE_ID="$(extract id)"
 if [[ -z "$HOLD_ACTIVE_ID" ]]; then
   fail "missing active hold id"
+fi
+
+say "Holds: list active (user, includes new hold)"
+request "GET" "$API_BASE/holds" "" "$user_cookie"
+expect_status "200"
+if ! echo "$body" | grep -q "$HOLD_ACTIVE_ID"; then
+  fail "expected active holds to include $HOLD_ACTIVE_ID"
 fi
 
 say "Admin: cancel event"
@@ -244,6 +309,13 @@ request "GET" "$API_BASE/admin/events/$EVENT_ID/zones/$ZONE_ID/holds" "" "$admin
 expect_status "200"
 if [[ "$(echo "$body" | tr -d '[:space:]')" != "[]" ]]; then
   fail "expected empty active holds list after cancellation"
+fi
+
+say "Holds: list active (user, should be empty)"
+request "GET" "$API_BASE/holds" "" "$user_cookie"
+expect_status "200"
+if [[ "$(echo "$body" | tr -d '[:space:]')" != "[]" ]]; then
+  fail "expected no active holds after cancellation"
 fi
 
 say "Confirm: event cancelled"

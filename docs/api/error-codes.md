@@ -53,6 +53,12 @@ All error responses are JSON with a stable code:
 - 500 `internal_error`
 - 405 `method_not_allowed`
 
+### `GET /holds`
+- 400 `invalid_id`
+- 401 `unauthorized`
+- 500 `internal_error`
+- 405 `method_not_allowed`
+
 ### `POST /holds/{hold_id}/confirm`
 - 400 `idempotency_key_required`
 - 401 `unauthorized`
@@ -70,6 +76,12 @@ All error responses are JSON with a stable code:
 - 500 `internal_error`
 - 405 `method_not_allowed`
 
+### `GET /orders`
+- 400 `invalid_id`
+- 401 `unauthorized`
+- 500 `internal_error`
+- 405 `method_not_allowed`
+
 ### `POST /auth/register`
 - 400 `invalid_request_body`, `username_required`, `username_invalid`, `email_required`, `password_required`
 - 403 `registration_disabled`
@@ -84,6 +96,12 @@ All error responses are JSON with a stable code:
 - 405 `method_not_allowed`
 
 ### `POST /auth/logout`
+- 500 `internal_error`
+- 405 `method_not_allowed`
+
+### `POST /auth/password`
+- 400 `invalid_request_body`, `password_required`
+- 401 `unauthorized`, `invalid_credentials`
 - 500 `internal_error`
 - 405 `method_not_allowed`
 

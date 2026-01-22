@@ -203,4 +203,53 @@ func TestHoldRepository(t *testing.T) {
 			t.Fatalf("expected hold persisted, got count %d", count)
 		}
 	})
+
+	t.Run("ListActiveHoldsByUser returns active, unexpired holds", func(t *testing.T) {
+		ctx := context.Background()
+		testutil.TruncateAll(t, ctx, pool)
+		eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+		userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
+		otherUserID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
+		now := time.Now().UTC()
+
+		holdID := testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+			UserID:         userID,
+			Status:         domain.HoldStatusActive,
+			Quantity:       2,
+			ExpiresAt:      now.Add(5 * time.Minute),
+			IdempotencyKey: "idem-active",
+		})
+		testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+			UserID:         userID,
+			Status:         domain.HoldStatusActive,
+			Quantity:       2,
+			ExpiresAt:      now.Add(-1 * time.Minute),
+			IdempotencyKey: "idem-expired",
+		})
+		testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+			UserID:         userID,
+			Status:         domain.HoldStatusConfirmed,
+			Quantity:       1,
+			ExpiresAt:      now.Add(5 * time.Minute),
+			IdempotencyKey: "idem-confirmed",
+		})
+		testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+			UserID:         otherUserID,
+			Status:         domain.HoldStatusActive,
+			Quantity:       1,
+			ExpiresAt:      now.Add(5 * time.Minute),
+			IdempotencyKey: "idem-other",
+		})
+
+		holds, err := repo.ListActiveHoldsByUser(ctx, userID, now)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(holds) != 1 {
+			t.Fatalf("expected 1 hold, got %d", len(holds))
+		}
+		if holds[0].ID != holdID {
+			t.Fatalf("expected hold %s, got %s", holdID, holds[0].ID)
+		}
+	})
 }

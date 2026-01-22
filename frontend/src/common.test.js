@@ -9,6 +9,7 @@ import {
   request,
   setOutput,
   setupEventPicker,
+  setupHoldPicker,
   setupZonePicker,
 } from './common.js';
 
@@ -217,6 +218,92 @@ describe('setupEventPicker', () => {
     const { eventInput, dropdown } = setupDOM();
 
     eventInput.dispatchEvent(new Event('focus'));
+    await flushPromises();
+
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(dropdown.hidden).toBe(true);
+  });
+});
+
+describe('setupHoldPicker', () => {
+  const holds = [{ id: 'hold-1' }, { id: 'hold-2' }];
+
+  function setupDOM() {
+    document.body.innerHTML = `
+      <form id="form">
+        <div class="hold-picker" data-hold-picker>
+          <input name="hold_id" />
+          <div class="hold-dropdown" data-hold-dropdown hidden></div>
+        </div>
+      </form>
+      <pre id="output"></pre>
+    `;
+    const form = document.getElementById('form');
+    const output = document.getElementById('output');
+    setupHoldPicker(output, form);
+    return {
+      holdInput: form.querySelector('input[name="hold_id"]'),
+      dropdown: form.querySelector('[data-hold-dropdown]'),
+    };
+  }
+
+  function mockFetch(body = holds, status = 200) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        status,
+        text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+      })),
+    );
+  }
+
+  it('selects a hold and closes', async () => {
+    mockFetch();
+    const { holdInput, dropdown } = setupDOM();
+
+    holdInput.dispatchEvent(new Event('focus'));
+    await flushPromises();
+
+    const option = dropdown.querySelector('.hold-option');
+    option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+
+    expect(holdInput.value).toBe('hold-1');
+    expect(dropdown.hidden).toBe(true);
+  });
+
+  it('filters holds by id', async () => {
+    mockFetch();
+    const { holdInput, dropdown } = setupDOM();
+
+    holdInput.dispatchEvent(new Event('focus'));
+    await flushPromises();
+
+    holdInput.value = 'hold-2';
+    holdInput.dispatchEvent(new Event('input'));
+
+    const options = dropdown.querySelectorAll('.hold-option');
+    expect(options.length).toBe(1);
+    expect(options[0].textContent).toBe('hold-2');
+  });
+
+  it('renders an empty state when no holds match', async () => {
+    mockFetch();
+    const { holdInput, dropdown } = setupDOM();
+
+    holdInput.dispatchEvent(new Event('focus'));
+    await flushPromises();
+
+    holdInput.value = 'missing';
+    holdInput.dispatchEvent(new Event('input'));
+
+    expect(dropdown.querySelector('.hold-empty')?.textContent).toBe('No active holds');
+  });
+
+  it('closes when clicking outside', async () => {
+    mockFetch();
+    const { holdInput, dropdown } = setupDOM();
+
+    holdInput.dispatchEvent(new Event('focus'));
     await flushPromises();
 
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));

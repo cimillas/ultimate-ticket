@@ -93,6 +93,27 @@ WHERE id = $1`
 	return user, nil
 }
 
+func (r *AuthRepository) GetUserByIDWithPasswordHash(ctx context.Context, userID string) (domain.User, string, error) {
+	const query = `
+SELECT id, username, email, role, password_hash, created_at
+FROM users
+WHERE id = $1`
+	var user domain.User
+	var role string
+	var hash string
+	if err := r.queryRow(ctx, query, userID).Scan(&user.ID, &user.Username, &user.Email, &role, &hash, &user.CreatedAt); err != nil {
+		if isInvalidUUID(err) {
+			return domain.User{}, "", domain.ErrInvalidID
+		}
+		if err == pgx.ErrNoRows {
+			return domain.User{}, "", domain.ErrUserNotFound
+		}
+		return domain.User{}, "", fmt.Errorf("get user by id: %w", err)
+	}
+	user.Role = domain.UserRole(role)
+	return user, hash, nil
+}
+
 func (r *AuthRepository) CreateSession(ctx context.Context, session domain.Session) error {
 	const stmt = `
 INSERT INTO sessions (token_hash, user_id, expires_at, created_at, last_used_at)
@@ -144,6 +165,29 @@ func (r *AuthRepository) DeleteSession(ctx context.Context, tokenHash string) er
 	const stmt = `DELETE FROM sessions WHERE token_hash = $1`
 	if _, err := r.exec(ctx, stmt, tokenHash); err != nil {
 		return fmt.Errorf("delete session: %w", err)
+	}
+	return nil
+}
+
+func (r *AuthRepository) DeleteSessionsForUserExcept(ctx context.Context, userID, tokenHash string) error {
+	const stmt = `DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2`
+	if _, err := r.exec(ctx, stmt, userID, tokenHash); err != nil {
+		return fmt.Errorf("delete sessions for user: %w", err)
+	}
+	return nil
+}
+
+func (r *AuthRepository) UpdateUserPassword(ctx context.Context, userID, passwordHash string) error {
+	const stmt = `UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1`
+	tag, err := r.exec(ctx, stmt, userID, passwordHash)
+	if err != nil {
+		if isInvalidUUID(err) {
+			return domain.ErrInvalidID
+		}
+		return fmt.Errorf("update user password: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrUserNotFound
 	}
 	return nil
 }

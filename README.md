@@ -49,6 +49,7 @@ API (default config)
     - `POST /auth/register` with JSON `{username, email, password}`
     - `POST /auth/login` with JSON `{identifier, password}`
     - `POST /auth/logout`
+    - `POST /auth/password` with JSON `{current_password, new_password}` (requires login)
     - `GET /me`
     - Note: usernames cannot contain `@` (use the email field instead).
     - Public registration can be disabled via `ALLOW_PUBLIC_REGISTER=false`.
@@ -61,6 +62,8 @@ API (default config)
     - `GET /events/{event_id}/zones`
   - Protected:
     - `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}` (requires login)
+    - `GET /holds` returns active holds for the current user (requires login)
+    - `GET /orders` returns orders for the current user (requires login)
     - `POST /holds/{id}/confirm` with header `Idempotency-Key` (requires login)
     - Holds are owned by the authenticated user; idempotency keys are scoped per user.
   - Admin (local tooling only, requires admin login):
@@ -90,6 +93,43 @@ curl -s -b cookies.txt -X POST http://localhost:8080/holds \
 Expected response (201):
 ```json
 {"id":"<hold_id>","status":"active","expires_at":"<expires_at>"}
+```
+
+```bash
+# List active holds for current user (200)
+curl -s -b cookies.txt http://localhost:8080/holds
+```
+Expected response (200):
+```json
+[
+  {
+    "id":"<hold_id>",
+    "event_id":"<event_id>",
+    "zone_id":"<zone_id>",
+    "quantity":2,
+    "status":"active",
+    "expires_at":"<expires_at>"
+  }
+]
+```
+
+```bash
+# List orders for current user (200)
+curl -s -b cookies.txt http://localhost:8080/orders
+```
+Expected response (200):
+```json
+[
+  {
+    "id":"<order_id>",
+    "hold_id":"<hold_id>",
+    "event_id":"<event_id>",
+    "zone_id":"<zone_id>",
+    "quantity":2,
+    "status":"confirmed",
+    "created_at":"<created_at>"
+  }
+]
 ```
 
 ```bash
@@ -135,6 +175,17 @@ Expected response (200):
 ```
 Note: `status` can be `confirmed` or `refunded` if the event was cancelled after confirmation.
 
+```bash
+# Change password (200)
+curl -s -b cookies.txt -X POST http://localhost:8080/auth/password \
+  -H 'Content-Type: application/json' \
+  -d '{"current_password":"old-secret","new_password":"new-secret"}'
+```
+Expected response (200):
+```json
+{"ok":true}
+```
+
 Error format:
 ```json
 {"error":"<message>","code":"<code>"}
@@ -177,7 +228,7 @@ make frontend-test
 ```
 
 Frontend pages:
-- Console: `http://localhost:5173/`
+- Dashboard: `http://localhost:5173/`
 - Admin (requires admin login): `http://localhost:5173/admin/`
 - Login: `http://localhost:5173/login/`
 - Register: `http://localhost:5173/register/`
@@ -201,6 +252,7 @@ make backend-build
 make backend-auth-bootstrap
 APP_ENV=local CONFIRM=YES make backend-auth-reset
 ALLOW_PUBLIC_REGISTER=true make backend-e2e
+E2E_RESET_AUTH=1 ALLOW_PUBLIC_REGISTER=true make backend-e2e
 ```
 
 ## Repository layout (initial)

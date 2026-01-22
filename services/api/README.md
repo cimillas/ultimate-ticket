@@ -58,6 +58,7 @@ Endpoints:
   - `POST /auth/register` with JSON `{username, email, password}`
   - `POST /auth/login` with JSON `{identifier, password}`
   - `POST /auth/logout`
+  - `POST /auth/password` with JSON `{current_password, new_password}` (requires login)
   - `GET /me`
   - Note: usernames cannot contain `@` (use the email field instead).
   - Public registration can be disabled via `ALLOW_PUBLIC_REGISTER=false`.
@@ -70,6 +71,8 @@ Endpoints:
   - `GET /events/{event_id}/zones`
 - Protected:
   - `POST /holds` with JSON `{event_id, zone_id, quantity, idempotency_key}` (requires login)
+  - `GET /holds` returns active holds for the current user (requires login)
+  - `GET /orders` returns orders for the current user (requires login)
   - `POST /holds/{id}/confirm` with header `Idempotency-Key` (requires login)
 - Admin (local tooling only, requires admin login):
   - `POST /admin/events` + `GET /admin/events`

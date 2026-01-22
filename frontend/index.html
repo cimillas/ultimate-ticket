@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ultimate Ticket Console</title>
+    <title>Ultimate Ticket Dashboard</title>
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap"
@@ -14,12 +14,12 @@
     <main>
       <header>
         <div>
-          <h1>Ultimate Ticket Console</h1>
+          <h1>Ultimate Ticket Dashboard</h1>
           <p>Local tools for events, zones, holds, and confirms.</p>
         </div>
         <div class="header-meta">
           <nav class="nav">
-            <a href="/" aria-current="page">Console</a>
+            <a href="/" aria-current="page">Dashboard</a>
             <a href="/admin/" id="admin-link" hidden>Admin</a>
             <a href="/login/" id="login-link">Login</a>
           </nav>
@@ -34,14 +34,14 @@
       <div class="layout">
         <div class="stack">
           <section class="input-section">
-            <h2>List events</h2>
+            <h2>Browse events</h2>
             <div class="form-block">
-              <button id="list-events" type="button">List events</button>
+              <button id="list-events" type="button">Show events</button>
             </div>
           </section>
 
           <section class="input-section">
-            <h2>List zones</h2>
+            <h2>Find zones</h2>
             <form id="list-zones" autocomplete="off">
               <label>
                 Event (select or paste ID)
@@ -50,12 +50,12 @@
                   <div class="event-dropdown" data-event-dropdown hidden></div>
                 </div>
               </label>
-              <button type="submit">List zones</button>
+              <button type="submit">Show zones</button>
             </form>
           </section>
 
           <section class="input-section" data-auth-only hidden>
-            <h2>Holds</h2>
+            <h2>Reserve tickets</h2>
             <form id="create-hold" autocomplete="off">
               <label>
                 Event (select or paste ID)
@@ -89,11 +89,14 @@
           </section>
 
           <section class="input-section" data-auth-only hidden>
-            <h2>Confirm hold</h2>
+            <h2>Confirm reservation</h2>
             <form id="confirm-hold" autocomplete="off">
               <label>
-                Hold ID
-                <input name="hold_id" required />
+                Hold (select or paste ID)
+                <div class="hold-picker" data-hold-picker>
+                  <input name="hold_id" required />
+                  <div class="hold-dropdown" data-hold-dropdown hidden></div>
+                </div>
               </label>
               <label>
                 Idempotency Key
@@ -107,10 +110,33 @@
               <button type="submit">Confirm hold</button>
             </form>
           </section>
+
+          <section class="input-section" data-auth-only hidden>
+            <h2>My activity</h2>
+            <div class="form-block">
+              <button id="list-my-holds" type="button">List my active holds</button>
+              <button id="list-my-orders" type="button">List my orders</button>
+            </div>
+          </section>
+
+          <section class="input-section" data-auth-only hidden>
+            <h2>Account</h2>
+            <form id="change-password" autocomplete="off">
+              <label>
+                Current password
+                <input name="current_password" type="password" required />
+              </label>
+              <label>
+                New password
+                <input name="new_password" type="password" required />
+              </label>
+              <button type="submit">Update password</button>
+            </form>
+          </section>
         </div>
 
         <section class="response-panel">
-          <h2>Response</h2>
+          <h2>API response</h2>
           <pre id="output"></pre>
         </section>
       </div>

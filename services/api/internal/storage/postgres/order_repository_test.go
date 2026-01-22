@@ -129,4 +129,51 @@ func TestOrderRepository(t *testing.T) {
 			t.Fatalf("expected status confirmed, got %s", status)
 		}
 	})
+
+	t.Run("ListOrdersByUser returns orders with hold data", func(t *testing.T) {
+		ctx := context.Background()
+		testutil.TruncateAll(t, ctx, pool)
+		eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+		userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
+		otherUserID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
+		now := time.Now().UTC()
+
+		holdID := testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+			UserID:         userID,
+			Status:         domain.HoldStatusConfirmed,
+			Quantity:       2,
+			ExpiresAt:      now.Add(5 * time.Minute),
+			IdempotencyKey: "idem-hold",
+		})
+		testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+			UserID:         otherUserID,
+			Status:         domain.HoldStatusConfirmed,
+			Quantity:       1,
+			ExpiresAt:      now.Add(5 * time.Minute),
+			IdempotencyKey: "idem-other",
+		})
+
+		if _, err := pool.Exec(ctx, `
+INSERT INTO orders (id, hold_id, idempotency_key, status, created_at)
+VALUES ($1, $2, $3, $4, $5)`,
+			"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			holdID,
+			"idem-order",
+			domain.OrderStatusConfirmed,
+			now,
+		); err != nil {
+			t.Fatalf("insert order: %v", err)
+		}
+
+		orders, err := repo.ListOrdersByUser(ctx, userID)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(orders) != 1 {
+			t.Fatalf("expected 1 order, got %d", len(orders))
+		}
+		if orders[0].HoldID != holdID || orders[0].EventID != eventID || orders[0].ZoneID != zoneID {
+			t.Fatalf("unexpected order summary: %+v", orders[0])
+		}
+	})
 }

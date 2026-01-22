@@ -136,6 +136,63 @@ func TestCreateHold_EventStarted_HTTPIntegration(t *testing.T) {
 	}
 }
 
+func TestListHolds_HTTPIntegration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	testutil.ApplyMigrations(t, context.Background(), pool)
+	now := time.Date(2025, 1, 4, 11, 0, 0, 0, time.UTC)
+	repo := postgres.NewHoldRepository(pool)
+	svc := app.NewHoldService(repo, clock.NewFixed(now))
+
+	ctx := context.Background()
+	testutil.TruncateAll(t, ctx, pool)
+	eventID, zoneID := testutil.InsertEventAndZone(t, ctx, pool, "Concert", 100)
+	userID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
+	otherUserID := testutil.InsertUser(t, ctx, pool, domain.UserRoleUser)
+
+	holdID := testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+		UserID:         userID,
+		Status:         domain.HoldStatusActive,
+		Quantity:       1,
+		ExpiresAt:      now.Add(10 * time.Minute),
+		IdempotencyKey: "idem-active",
+	})
+	testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+		UserID:         userID,
+		Status:         domain.HoldStatusActive,
+		Quantity:       1,
+		ExpiresAt:      now.Add(-1 * time.Minute),
+		IdempotencyKey: "idem-expired",
+	})
+	testutil.InsertHold(t, ctx, pool, eventID, zoneID, domain.Hold{
+		UserID:         otherUserID,
+		Status:         domain.HoldStatusActive,
+		Quantity:       1,
+		ExpiresAt:      now.Add(10 * time.Minute),
+		IdempotencyKey: "idem-other",
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/holds", nil)
+	req = withAuth(req, userID)
+	rec := httptest.NewRecorder()
+
+	HandleCreateHold(svc).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var resp []listHoldResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp) != 1 {
+		t.Fatalf("expected 1 hold, got %d", len(resp))
+	}
+	if resp[0].ID != holdID {
+		t.Fatalf("expected hold %s, got %s", holdID, resp[0].ID)
+	}
+}
+
 func TestCreateAndConfirm_HTTPIntegration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 	testutil.ApplyMigrations(t, context.Background(), pool)

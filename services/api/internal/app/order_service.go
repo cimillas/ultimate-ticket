@@ -12,6 +12,7 @@ type OrderRepository interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
 	GetHoldForUpdate(ctx context.Context, holdID string) (domain.Hold, time.Time, domain.EventStatus, error)
 	GetOrderByHoldID(ctx context.Context, holdID string) (*domain.Order, error)
+	ListOrdersByUser(ctx context.Context, userID string) ([]domain.OrderSummary, error)
 	CreateOrder(ctx context.Context, order domain.Order) error
 	UpdateHoldStatus(ctx context.Context, holdID string, status domain.HoldStatus) error
 	UpdateEventStatus(ctx context.Context, eventID string, status domain.EventStatus) error
@@ -152,4 +153,11 @@ func (s *OrderService) ConfirmHold(ctx context.Context, in ConfirmHoldInput) (Co
 		return ConfirmHoldResult{}, eventErr
 	}
 	return result, nil
+}
+
+func (s *OrderService) ListOrdersByUser(ctx context.Context, userID string) ([]domain.OrderSummary, error) {
+	if userID == "" {
+		return nil, domain.ErrUnauthorized
+	}
+	return s.repo.ListOrdersByUser(ctx, userID)
 }

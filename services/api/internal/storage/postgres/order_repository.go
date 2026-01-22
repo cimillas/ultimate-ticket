@@ -65,6 +65,53 @@ func (r *OrderRepository) GetOrderByHoldID(ctx context.Context, holdID string) (
 	return &o, nil
 }
 
+func (r *OrderRepository) ListOrdersByUser(ctx context.Context, userID string) ([]domain.OrderSummary, error) {
+	const query = `
+SELECT o.id, o.hold_id, o.status, o.created_at, h.event_id, h.zone_id, h.quantity
+FROM orders o
+JOIN holds h ON h.id = o.hold_id
+WHERE h.user_id = $1
+ORDER BY o.created_at`
+
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if tx := txFromContext(ctx); tx != nil {
+		rows, err = tx.Query(ctx, query, userID)
+	} else {
+		rows, err = r.pool.Query(ctx, query, userID)
+	}
+	if err != nil {
+		if isInvalidUUID(err) {
+			return nil, domain.ErrInvalidID
+		}
+		return nil, fmt.Errorf("list orders by user: %w", err)
+	}
+	defer rows.Close()
+
+	orders := []domain.OrderSummary{}
+	for rows.Next() {
+		var summary domain.OrderSummary
+		if err := rows.Scan(
+			&summary.ID,
+			&summary.HoldID,
+			&summary.Status,
+			&summary.CreatedAt,
+			&summary.EventID,
+			&summary.ZoneID,
+			&summary.Quantity,
+		); err != nil {
+			return nil, fmt.Errorf("scan order summary: %w", err)
+		}
+		orders = append(orders, summary)
+	}
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("list orders by user: %w", rows.Err())
+	}
+	return orders, nil
+}
+
 func (r *OrderRepository) CreateOrder(ctx context.Context, order domain.Order) error {
 	status := order.Status
 	if status == "" {

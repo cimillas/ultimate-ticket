@@ -198,13 +198,15 @@ select {
 }
 
 .zone-picker,
-.event-picker {
+.event-picker,
+.hold-picker {
   position: relative;
   width: 100%;
 }
 
 .zone-dropdown,
-.event-dropdown {
+.event-dropdown,
+.hold-dropdown {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -222,12 +224,14 @@ select {
 }
 
 .zone-dropdown[hidden],
-.event-dropdown[hidden] {
+.event-dropdown[hidden],
+.hold-dropdown[hidden] {
   display: none;
 }
 
 .zone-empty,
-.event-empty {
+.event-empty,
+.hold-empty {
   color: var(--muted);
   font-size: 13px;
   padding: 6px 8px;
@@ -249,7 +253,8 @@ button:hover {
 }
 
 .zone-dropdown .zone-option,
-.event-dropdown .event-option {
+.event-dropdown .event-option,
+.hold-dropdown .hold-option {
   background: #f4eee6;
   color: var(--ink);
   border: 1px solid var(--stroke);
@@ -261,7 +266,8 @@ button:hover {
 }
 
 .zone-dropdown .zone-option:hover,
-.event-dropdown .event-option:hover {
+.event-dropdown .event-option:hover,
+.hold-dropdown .hold-option:hover {
   background: #ede4da;
 }
 

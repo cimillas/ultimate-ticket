@@ -32,10 +32,13 @@ type AuthRepository interface {
 	GetUserByUsername(ctx context.Context, username string) (domain.User, string, error)
 	GetUserByEmail(ctx context.Context, email string) (domain.User, string, error)
 	GetUserByID(ctx context.Context, userID string) (domain.User, error)
+	GetUserByIDWithPasswordHash(ctx context.Context, userID string) (domain.User, string, error)
 	CreateSession(ctx context.Context, session domain.Session) error
 	GetSession(ctx context.Context, tokenHash string) (domain.Session, error)
 	UpdateSession(ctx context.Context, session domain.Session) error
 	DeleteSession(ctx context.Context, tokenHash string) error
+	DeleteSessionsForUserExcept(ctx context.Context, userID, tokenHash string) error
+	UpdateUserPassword(ctx context.Context, userID, passwordHash string) error
 	ResetAuth(ctx context.Context, admin domain.User, passwordHash string) error
 }
 
@@ -65,6 +68,13 @@ type RegisterInput struct {
 type LoginInput struct {
 	Identifier string
 	Password   string
+}
+
+type ChangePasswordInput struct {
+	UserID          string
+	CurrentPassword string
+	NewPassword     string
+	SessionToken    string
 }
 
 type AuthResult struct {
@@ -205,6 +215,37 @@ func (s *AuthService) Logout(ctx context.Context, token string) error {
 		return nil
 	}
 	return s.repo.DeleteSession(ctx, hashToken(token))
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, in ChangePasswordInput) error {
+	if in.UserID == "" || in.SessionToken == "" {
+		return domain.ErrUnauthorized
+	}
+	if in.CurrentPassword == "" || in.NewPassword == "" {
+		return domain.ErrPasswordRequired
+	}
+
+	_, hash, err := s.repo.GetUserByIDWithPasswordHash(ctx, in.UserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return domain.ErrUnauthorized
+		}
+		return err
+	}
+
+	ok, err := verifyPassword(in.CurrentPassword, hash)
+	if err != nil || !ok {
+		return domain.ErrInvalidCredentials
+	}
+
+	newHash, err := hashPassword(in.NewPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UpdateUserPassword(ctx, in.UserID, newHash); err != nil {
+		return err
+	}
+	return s.repo.DeleteSessionsForUserExcept(ctx, in.UserID, hashToken(in.SessionToken))
 }
 
 func (s *AuthService) BootstrapAdmin(ctx context.Context, username, email, password string) error {

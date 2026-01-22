@@ -17,3 +17,14 @@ type Order struct {
 	Status         OrderStatus
 	CreatedAt      time.Time
 }
+
+// OrderSummary represents a user-scoped view of an order with hold context.
+type OrderSummary struct {
+	ID        string
+	HoldID    string
+	EventID   string
+	ZoneID    string
+	Quantity  int
+	Status    OrderStatus
+	CreatedAt time.Time
+}

@@ -302,6 +302,117 @@ func TestAuthService_Register_RejectsEmailMatchingUsername(t *testing.T) {
 	}
 }
 
+func TestAuthService_ChangePassword(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2025, 2, 10, 10, 0, 0, 0, time.UTC)
+
+	t.Run("updates password and clears other sessions", func(t *testing.T) {
+		repo := newFakeAuthRepo()
+		svc := NewAuthService(repo, clock.NewFixed(now), time.Hour)
+
+		oldHash, err := hashPassword("old-secret")
+		if err != nil {
+			t.Fatalf("hash password: %v", err)
+		}
+		repo.users["user"] = storedUser{
+			User: domain.User{
+				ID:       "user-1",
+				Username: "user",
+				Email:    "user@example.com",
+				Role:     domain.UserRoleUser,
+			},
+			PasswordHash: oldHash,
+		}
+		keepHash := hashToken("keep-token")
+		dropHash := hashToken("drop-token")
+		repo.sessions[keepHash] = storedSession{Session: domain.Session{TokenHash: keepHash, UserID: "user-1"}}
+		repo.sessions[dropHash] = storedSession{Session: domain.Session{TokenHash: dropHash, UserID: "user-1"}}
+
+		err = svc.ChangePassword(context.Background(), ChangePasswordInput{
+			UserID:          "user-1",
+			CurrentPassword: "old-secret",
+			NewPassword:     "new-secret",
+			SessionToken:    "keep-token",
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if repo.lastPasswordUserID != "user-1" {
+			t.Fatalf("expected password update for user-1, got %s", repo.lastPasswordUserID)
+		}
+		if repo.lastPasswordHash == "" || repo.lastPasswordHash == oldHash {
+			t.Fatalf("expected new password hash to be set")
+		}
+		if _, ok := repo.sessions[dropHash]; ok {
+			t.Fatalf("expected other sessions cleared")
+		}
+		if _, ok := repo.sessions[keepHash]; !ok {
+			t.Fatalf("expected current session to remain")
+		}
+	})
+
+	t.Run("invalid current password returns error", func(t *testing.T) {
+		repo := newFakeAuthRepo()
+		svc := NewAuthService(repo, clock.NewFixed(now), time.Hour)
+
+		oldHash, err := hashPassword("old-secret")
+		if err != nil {
+			t.Fatalf("hash password: %v", err)
+		}
+		repo.users["user"] = storedUser{
+			User: domain.User{
+				ID:       "user-1",
+				Username: "user",
+				Email:    "user@example.com",
+				Role:     domain.UserRoleUser,
+			},
+			PasswordHash: oldHash,
+		}
+
+		err = svc.ChangePassword(context.Background(), ChangePasswordInput{
+			UserID:          "user-1",
+			CurrentPassword: "wrong",
+			NewPassword:     "new-secret",
+			SessionToken:    "keep-token",
+		})
+		if err != domain.ErrInvalidCredentials {
+			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+		}
+		if repo.lastPasswordUserID != "" {
+			t.Fatalf("expected password not updated")
+		}
+	})
+
+	t.Run("missing passwords return error", func(t *testing.T) {
+		repo := newFakeAuthRepo()
+		svc := NewAuthService(repo, clock.NewFixed(now), time.Hour)
+
+		err := svc.ChangePassword(context.Background(), ChangePasswordInput{
+			UserID:       "user-1",
+			SessionToken: "keep-token",
+		})
+		if err != domain.ErrPasswordRequired {
+			t.Fatalf("expected ErrPasswordRequired, got %v", err)
+		}
+	})
+
+	t.Run("missing user returns error", func(t *testing.T) {
+		repo := newFakeAuthRepo()
+		svc := NewAuthService(repo, clock.NewFixed(now), time.Hour)
+
+		err := svc.ChangePassword(context.Background(), ChangePasswordInput{
+			UserID:          "",
+			CurrentPassword: "old-secret",
+			NewPassword:     "new-secret",
+			SessionToken:    "keep-token",
+		})
+		if err != domain.ErrUnauthorized {
+			t.Fatalf("expected ErrUnauthorized, got %v", err)
+		}
+	})
+}
+
 type storedUser struct {
 	domain.User
 	PasswordHash string
@@ -317,6 +428,10 @@ type fakeAuthRepo struct {
 	lastCreatedUser    domain.User
 	lastSession        domain.Session
 	lastUpdatedSession domain.Session
+	lastPasswordUserID string
+	lastPasswordHash   string
+	lastSessionUserID  string
+	lastSessionToken   string
 }
 
 func newFakeAuthRepo() *fakeAuthRepo {
@@ -366,6 +481,15 @@ func (f *fakeAuthRepo) GetUserByID(_ context.Context, userID string) (domain.Use
 	return domain.User{}, domain.ErrUserNotFound
 }
 
+func (f *fakeAuthRepo) GetUserByIDWithPasswordHash(_ context.Context, userID string) (domain.User, string, error) {
+	for _, user := range f.users {
+		if user.ID == userID {
+			return user.User, user.PasswordHash, nil
+		}
+	}
+	return domain.User{}, "", domain.ErrUserNotFound
+}
+
 func (f *fakeAuthRepo) CreateSession(_ context.Context, session domain.Session) error {
 	f.sessions[session.TokenHash] = storedSession{Session: session}
 	f.lastSession = session
@@ -389,6 +513,30 @@ func (f *fakeAuthRepo) UpdateSession(_ context.Context, session domain.Session) 
 func (f *fakeAuthRepo) DeleteSession(_ context.Context, tokenHash string) error {
 	delete(f.sessions, tokenHash)
 	return nil
+}
+
+func (f *fakeAuthRepo) DeleteSessionsForUserExcept(_ context.Context, userID, tokenHash string) error {
+	f.lastSessionUserID = userID
+	f.lastSessionToken = tokenHash
+	for key, session := range f.sessions {
+		if session.UserID == userID && key != tokenHash {
+			delete(f.sessions, key)
+		}
+	}
+	return nil
+}
+
+func (f *fakeAuthRepo) UpdateUserPassword(_ context.Context, userID, passwordHash string) error {
+	for name, user := range f.users {
+		if user.ID == userID {
+			user.PasswordHash = passwordHash
+			f.users[name] = user
+			f.lastPasswordUserID = userID
+			f.lastPasswordHash = passwordHash
+			return nil
+		}
+	}
+	return domain.ErrUserNotFound
 }
 
 func (f *fakeAuthRepo) ResetAuth(_ context.Context, admin domain.User, passwordHash string) error {

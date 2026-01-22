@@ -72,6 +72,15 @@ export async function fetchZones(output, eventID) {
   return null;
 }
 
+export async function fetchActiveHolds(output) {
+  const res = await fetchJSON('/holds');
+  if (res.status >= 200 && res.status < 300 && Array.isArray(res.body)) {
+    return res.body;
+  }
+  setOutput(output, res.status, res.body);
+  return null;
+}
+
 export async function fetchEvents(output) {
   const res = await fetchJSON('/events');
   if (res.status >= 200 && res.status < 300 && Array.isArray(res.body)) {
@@ -96,6 +105,10 @@ function eventOptionLabel(event) {
     return `${event.name} (${event.id})`;
   }
   return event.name;
+}
+
+function holdOptionLabel(hold) {
+  return hold?.id || 'Unknown hold';
 }
 
 export function setupEventPicker(output, form) {
@@ -187,6 +200,104 @@ export function setupEventPicker(output, form) {
     event.preventDefault();
     eventInput.value = option.dataset.eventId;
     eventInput.dispatchEvent(new Event('change', { bubbles: true }));
+    closeDropdown();
+  });
+
+  document.addEventListener('mousedown', (event) => {
+    if (!picker.contains(event.target)) {
+      closeDropdown();
+    }
+  });
+}
+
+export function setupHoldPicker(output, form) {
+  const holdInput = form?.querySelector('input[name="hold_id"]');
+  const picker = form?.querySelector('[data-hold-picker]');
+  const dropdown = form?.querySelector('[data-hold-dropdown]');
+  if (!holdInput || !picker || !dropdown) {
+    return;
+  }
+
+  let holdsCache = [];
+
+  const closeDropdown = () => {
+    dropdown.hidden = true;
+  };
+
+  const openDropdown = () => {
+    if (dropdown.childElementCount === 0) {
+      return;
+    }
+    dropdown.hidden = false;
+  };
+
+  const renderOptions = (holds, filter = '') => {
+    dropdown.innerHTML = '';
+    const query = filter.trim().toLowerCase();
+
+    const filtered = query
+      ? holds.filter((hold) => {
+          const id = hold.id ? hold.id.toLowerCase() : '';
+          return id.includes(query);
+        })
+      : holds;
+
+    if (filtered.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'hold-empty';
+      empty.textContent = 'No active holds';
+      dropdown.appendChild(empty);
+      return;
+    }
+
+    for (const hold of filtered) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'hold-option';
+      button.dataset.holdId = hold.id;
+      button.textContent = holdOptionLabel(hold);
+      dropdown.appendChild(button);
+    }
+  };
+
+  const loadHolds = async (open = false) => {
+    dropdown.innerHTML = '';
+    holdsCache = [];
+    const holds = await fetchActiveHolds(output);
+    holdsCache = Array.isArray(holds) ? holds : [];
+    renderOptions(holdsCache, holdInput.value);
+    if (open) {
+      openDropdown();
+    }
+  };
+
+  holdInput.addEventListener('focus', () => {
+    loadHolds(true);
+  });
+
+  holdInput.addEventListener('input', () => {
+    if (holdsCache.length === 0) {
+      loadHolds(true);
+      return;
+    }
+    renderOptions(holdsCache, holdInput.value);
+    openDropdown();
+  });
+
+  holdInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeDropdown();
+    }
+  });
+
+  dropdown.addEventListener('mousedown', (event) => {
+    const option = event.target.closest('.hold-option');
+    if (!option) {
+      return;
+    }
+    event.preventDefault();
+    holdInput.value = option.dataset.holdId;
+    holdInput.dispatchEvent(new Event('change', { bubbles: true }));
     closeDropdown();
   });
 

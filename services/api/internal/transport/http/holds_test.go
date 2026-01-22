@@ -158,11 +158,73 @@ func withAuth(req *http.Request, userID string) *http.Request {
 	return req.WithContext(WithAuth(req.Context(), session))
 }
 
+func TestHandleListHolds(t *testing.T) {
+	t.Parallel()
+
+	holds := []domain.Hold{
+		{ID: "hold-1", EventID: "event-1", ZoneID: "zone-1", Quantity: 2, Status: domain.HoldStatusActive},
+	}
+
+	tests := []struct {
+		name           string
+		withAuth       bool
+		expectedStatus int
+		expectedSubstr string
+	}{
+		{
+			name:           "success",
+			withAuth:       true,
+			expectedStatus: http.StatusOK,
+			expectedSubstr: `"id":"hold-1"`,
+		},
+		{
+			name:           "missing auth",
+			withAuth:       false,
+			expectedStatus: http.StatusUnauthorized,
+			expectedSubstr: `"code":"unauthorized"`,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			svc := &stubHoldService{
+				holds: holds,
+			}
+			req := httptest.NewRequest(http.MethodGet, "/holds", nil)
+			if tt.withAuth {
+				req = withAuth(req, "user-1")
+			}
+			rec := httptest.NewRecorder()
+
+			handler := HandleCreateHold(svc)
+			handler.ServeHTTP(rec, req)
+
+			res := rec.Result()
+			if res.StatusCode != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tt.expectedStatus, res.StatusCode)
+			}
+			if tt.expectedSubstr != "" {
+				body := rec.Body.String()
+				if !strings.Contains(body, tt.expectedSubstr) {
+					t.Fatalf("expected response to contain %q, got %q", tt.expectedSubstr, body)
+				}
+			}
+		})
+	}
+}
+
 type stubHoldService struct {
-	hold domain.Hold
-	err  error
+	holds []domain.Hold
+	hold  domain.Hold
+	err   error
 }
 
 func (s *stubHoldService) CreateHold(_ context.Context, _ app.CreateHoldInput) (domain.Hold, error) {
 	return s.hold, s.err
+}
+
+func (s *stubHoldService) ListActiveHoldsByUser(_ context.Context, _ string) ([]domain.Hold, error) {
+	return s.holds, s.err
 }

@@ -347,13 +347,59 @@ func TestOrderService_ConfirmHold(t *testing.T) {
 	})
 }
 
+func TestOrderService_ListOrdersByUser(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)
+
+	t.Run("returns orders for the user", func(t *testing.T) {
+		repo := newFakeOrderRepo(nil, nil, nil, now.Add(1*time.Hour))
+		repo.listOrders = []domain.OrderSummary{
+			{
+				ID:        "order-1",
+				HoldID:    "hold-1",
+				EventID:   "event-1",
+				ZoneID:    "zone-1",
+				Quantity:  2,
+				Status:    domain.OrderStatusConfirmed,
+				CreatedAt: now,
+			},
+		}
+		svc := NewOrderService(repo, clock.NewFixed(now))
+
+		orders, err := svc.ListOrdersByUser(context.Background(), "user-1")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if repo.lastUserID != "user-1" {
+			t.Fatalf("expected repo called with user-1, got %s", repo.lastUserID)
+		}
+		if len(orders) != 1 || orders[0].ID != "order-1" {
+			t.Fatalf("unexpected orders: %+v", orders)
+		}
+	})
+
+	t.Run("missing user returns error", func(t *testing.T) {
+		repo := newFakeOrderRepo(nil, nil, nil, now.Add(1*time.Hour))
+		svc := NewOrderService(repo, clock.NewFixed(now))
+
+		_, err := svc.ListOrdersByUser(context.Background(), "")
+		if err != domain.ErrUnauthorized {
+			t.Fatalf("expected ErrUnauthorized, got %v", err)
+		}
+	})
+}
+
 type fakeOrderRepo struct {
 	holds             map[string]domain.Hold
 	orders            map[string]domain.Order
+	listOrders        []domain.OrderSummary
+	listErr           error
 	eventStarts       map[string]time.Time
 	eventStatuses     map[string]domain.EventStatus
 	defaultEventStart time.Time
 	updatedEvents     map[string]domain.EventStatus
+	lastUserID        string
 }
 
 func newFakeOrderRepo(holds map[string]domain.Hold, eventStarts map[string]time.Time, eventStatuses map[string]domain.EventStatus, defaultEventStart time.Time) *fakeOrderRepo {
@@ -432,6 +478,14 @@ func (f *fakeOrderRepo) UpdateEventStatus(_ context.Context, eventID string, sta
 	return nil
 }
 
+func (f *fakeOrderRepo) ListOrdersByUser(_ context.Context, userID string) ([]domain.OrderSummary, error) {
+	f.lastUserID = userID
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return append([]domain.OrderSummary{}, f.listOrders...), nil
+}
+
 type raceOrderRepo struct {
 	hold     domain.Hold
 	startsAt time.Time
@@ -455,6 +509,10 @@ func (r *raceOrderRepo) GetOrderByHoldID(_ context.Context, holdID string) (*dom
 		return &r.order, nil
 	}
 	r.looked = true
+	return nil, nil
+}
+
+func (r *raceOrderRepo) ListOrdersByUser(_ context.Context, _ string) ([]domain.OrderSummary, error) {
 	return nil, nil
 }
 

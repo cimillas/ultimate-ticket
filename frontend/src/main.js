@@ -1,4 +1,11 @@
-import { refreshAuthStatus, request, setupEventPicker, setupZonePicker, toggleLoginLink } from './common.js';
+import {
+  refreshAuthStatus,
+  request,
+  setupEventPicker,
+  setupHoldPicker,
+  setupZonePicker,
+  toggleLoginLink,
+} from './common.js';
 
 const output = document.getElementById('output');
 const requestWithOutput = (path, options) => request(output, path, options);
@@ -170,6 +177,7 @@ confirmKeyInput.addEventListener('input', () => {
 setupEventPicker(output, listZonesForm);
 setupEventPicker(output, holdForm);
 setupZonePicker(output, holdForm);
+setupHoldPicker(output, confirmForm);
 
 const updateAuthUI = (user) => {
   const isAdmin = user?.role === 'admin';
@@ -246,3 +254,39 @@ confirmForm.addEventListener('submit', async (event) => {
     headers: { 'Idempotency-Key': idempotencyKey },
   });
 });
+
+const listMyHoldsButton = document.getElementById('list-my-holds');
+if (listMyHoldsButton) {
+  listMyHoldsButton.addEventListener('click', async () => {
+    await requestWithOutput('/holds');
+  });
+}
+
+const listMyOrdersButton = document.getElementById('list-my-orders');
+if (listMyOrdersButton) {
+  listMyOrdersButton.addEventListener('click', async () => {
+    await requestWithOutput('/orders');
+  });
+}
+
+const changePasswordForm = document.getElementById('change-password');
+if (changePasswordForm) {
+  changePasswordForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const currentPassword = form.current_password.value;
+    const newPassword = form.new_password.value;
+
+    const res = await requestWithOutput('/auth/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+    if (res?.status >= 200 && res.status < 300) {
+      form.reset();
+    }
+  });
+}

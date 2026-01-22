@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 This project follows Semantic Versioning (SemVer).
 
 ## [Unreleased]
+
+## [0.7.0]
 - Added Prometheus `/metrics` endpoint with request count and duration metrics.
 - Added `service` field in request logs with `SERVICE_NAME` env support.
 - Added `request_id` to error responses when available.

@@ -1,10 +1,10 @@
-# API contract inventory (v0.4.1)
+# API contract inventory
 
 ## Goal
 List the current API surface, auth requirements, required headers, and error
 codes so we can freeze contracts before extraction.
 
-Source of truth for error codes: `docs/api/error-codes.md`.
+Source of truth for error codes: `docs/reference/api/error-codes.md`.
 
 ## Public endpoints (no auth)
 - `GET /health`
@@ -75,7 +75,7 @@ Source of truth for error codes: `docs/api/error-codes.md`.
 
 ## Error contract
 - Error payload: `{"error":"<message>","code":"<code>","request_id":"<id>"}` (request_id optional)
-- Status codes and error codes are documented in `docs/api/error-codes.md`.
+- Status codes and error codes are documented in `docs/reference/api/error-codes.md`.
 
 ## Notes
 - Session cookie name: `ut_session`

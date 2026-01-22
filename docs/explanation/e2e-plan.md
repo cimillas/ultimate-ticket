@@ -46,6 +46,7 @@ Script:
 - Requires the API to be running locally and `ALLOW_PUBLIC_REGISTER=true`.
 - The runner does not start the API; launch it first (for example `make backend-run`).
 - Optional: set `E2E_RESET_AUTH=1` to reset auth tables for a clean admin login (local only).
+For execution steps, see `docs/how-to/run-tests.md`.
 
 ## Critical scenarios
 

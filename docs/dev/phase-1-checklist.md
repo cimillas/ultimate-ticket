@@ -6,10 +6,10 @@ freezing contracts and keeping critical behavior stable.
 
 ## Checklist
 ### Contracts and compatibility
-- [x] Confirm `docs/contracts/api-inventory.md` reflects all current endpoints.
-- [x] Confirm error codes in `docs/api/error-codes.md` match handler behavior.
-- [x] Confirm `docs/contracts/compatibility-checklist.md` is still valid.
-- [x] Record any breaking change in `docs/contracts/breaking-changes.md`.
+- [x] Confirm `docs/reference/api/api-inventory.md` reflects all current endpoints.
+- [x] Confirm error codes in `docs/reference/api/error-codes.md` match handler behavior.
+- [x] Confirm `docs/dev/compatibility-checklist.md` is still valid.
+- [x] Record any breaking change in `docs/dev/breaking-changes.md`.
 
 ### Tests and reliability
 - [x] `scripts/e2e/run.sh` passes on a clean database.
@@ -17,7 +17,7 @@ freezing contracts and keeping critical behavior stable.
 - [x] `make frontend-test` passes without flakes.
 
 ### Observability plan
-- [x] `docs/observability/plan.md` reviewed and approved for Phase 2 work.
+- [x] `docs/explanation/observability-plan.md` reviewed and approved for Phase 2 work.
 - [x] Request IDs are generated and returned by the API.
 
 ### Operational agreement

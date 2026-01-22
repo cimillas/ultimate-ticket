@@ -144,7 +144,7 @@ For integration tests:
 - Security-sensitive features will be designed explicitly and reviewed.
 
 ## 11) Documentation: ADRs
-Non-trivial design decisions must be captured in an ADR under `docs/adr/`:
+Non-trivial design decisions must be captured in an ADR under `docs/explanation/adr/`:
 - Context, decision, consequences, alternatives
 - Keep ADRs short and practical
 

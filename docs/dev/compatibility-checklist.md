@@ -33,14 +33,14 @@ extraction to avoid cascading changes.
    - `starts_at` closes events.
    - Hold expiry and confirmation rules.
 
-## Freeze status (v0.4.1)
+## Freeze status
 Checked items are considered **frozen** for the next 2–3 iterations.
 
-- [x] API inventory captured in `docs/contracts/api-inventory.md`
-- [x] Error codes defined in `docs/api/error-codes.md`
-- [x] Error payload schema (`{"error","code"}`) unchanged
+- [x] API inventory captured in `docs/reference/api/api-inventory.md`
+- [x] Error codes defined in `docs/reference/api/error-codes.md`
+- [x] Error payload schema (`{"error","code","request_id"}`) unchanged
 - [x] Error/status mapping reviewed against handlers
-- [x] Breaking changes log created (`docs/contracts/breaking-changes.md`)
+- [x] Breaking changes log created (`docs/dev/breaking-changes.md`)
 - [x] Auth cookie name + semantics (`ut_session`)
 - [x] Idempotency rules for holds/confirm (409 on conflicts)
 - [x] Domain states (`event`, `hold`, `order`)
@@ -72,6 +72,6 @@ log before extracting any service.
 
 ## Operational note (freeze window)
 For the next 2–3 iterations:
-- No breaking changes without ADR + entry in `docs/contracts/breaking-changes.md`.
+- No breaking changes without ADR + entry in `docs/dev/breaking-changes.md`.
 - Run `scripts/e2e/run.sh` (or `make test`) to validate critical flows.
-- Update `docs/contracts/api-inventory.md` only for additive changes.
+- Update `docs/reference/api/api-inventory.md` only for additive changes.

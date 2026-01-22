@@ -2,7 +2,7 @@
 
 ## Goal
 Define the minimal observability baseline needed before extracting services.
-This is a design plan only; implementation will follow later.
+This plan records baseline requirements and what is implemented in the monolith.
 
 ## Guiding principles
 - Prefer boring, low-dependency solutions first.
@@ -34,7 +34,7 @@ This is a design plan only; implementation will follow later.
 - Request IDs are generated and returned via `X-Request-Id` and included in logs.
 - Logs are JSON per line and include `service` via `SERVICE_NAME` (default `api`).
 - Prometheus metrics are exposed at `/metrics` (request count + duration).
-  See `docs/observability/metrics.md` for details.
+  See `docs/reference/observability/metrics.md` for details.
 - Error responses include `request_id` when available.
 
 ## Decisions needed (non-trivial)
@@ -50,8 +50,8 @@ This is a design plan only; implementation will follow later.
    - Option A: local files + shipping later.
    - Option B: direct stdout -> centralized collector.
 
-## Proposed initial implementation (later)
-- Add a small metrics endpoint in the API (Prometheus format).
+## Implementation notes for extracted services
+- Reuse the metrics middleware and `/metrics` endpoint from the monolith.
 - Attach service name via env `SERVICE_NAME` (default `api`).
 - Ensure `X-Request-Id` is forwarded in any internal HTTP calls.
 

@@ -1,32 +1,54 @@
-# Microservices extraction roadmap
+# Roadmap
 
-## Goal
-Provide a step-by-step, verifiable path to extract services without breaking
-existing contracts or slowing delivery.
+This document combines the product roadmap with the service extraction roadmap.
 
-## Phase 1: Stabilize contracts
+## Product phases
+### Phase 1
+- Monolithic Go service
+- PostgreSQL
+- Holds with TTL
+- No overselling
+- TDD only
+
+### Phase 2
+- Admission control / simple queue
+- Observability basics
+
+### Phase 3
+- Inventory scaling experiments
+- DynamoDB vs Postgres comparison
+
+## Service extraction roadmap
+### Phase 1: Stabilize contracts
 **Exit criteria**
-- No breaking API changes in 2–3 iterations.
+- No breaking API changes in 2-3 iterations.
 - Error codes stable and documented.
 - E2E critical flows pass on clean DB.
 - Observability plan approved.
 
 **Actions**
-- Adopt the compatibility checklist in `docs/contracts/compatibility-checklist.md`.
-- Freeze API + error codes; update docs when changes are additive only.
-- Keep a simple breaking-changes log.
+- Adopt the compatibility checklist in `docs/dev/compatibility-checklist.md`.
+- Freeze API + error codes; update docs only for additive changes.
+- Keep a breaking-changes log in `docs/dev/breaking-changes.md`.
 
-## Phase 2: Observability baseline
+**Status**
+- Complete. See `docs/dev/phase-1-checklist.md`.
+
+### Phase 2: Observability baseline
 **Exit criteria**
 - JSON logs consistent across services.
 - Request IDs propagated across boundaries.
-- Minimal metrics format decided (Prometheus vs OTel).
+- Minimal metrics exposed and documented.
 
 **Actions**
-- Add `SERVICE_NAME` env to logs (monolith first).
-- Decide metrics format and draft `/metrics` spec (no implementation yet).
+- Ensure `SERVICE_NAME` is set for request logs.
+- Expose `/metrics` with request count and duration.
+- Decide tracing and log aggregation approach (see `docs/explanation/observability-plan.md`).
 
-## Phase 3: Auth extraction (first service)
+**Status**
+- In progress. Logs include `service`, metrics are exposed, and error payloads include `request_id` when available.
+
+### Phase 3: Auth extraction (first service)
 **Exit criteria**
 - Auth API contract stable.
 - Session introspection plan approved.
@@ -37,7 +59,7 @@ existing contracts or slowing delivery.
 - Add an Auth client in the monolith (HTTP calls).
 - Migrate cookies to be issued by Auth service; backend uses introspection.
 
-## Phase 4: Inventory extraction
+### Phase 4: Inventory extraction
 **Exit criteria**
 - Holds/availability logic stable and tested for concurrency.
 - Idempotency semantics validated.
@@ -46,7 +68,7 @@ existing contracts or slowing delivery.
 - Extract event/zone/hold logic.
 - Expose inventory endpoints; monolith calls them.
 
-## Phase 5: Orders extraction
+### Phase 5: Orders extraction
 **Exit criteria**
 - Confirm flow stable and covered by E2E tests.
 - Refund/cancel rules unchanged for multiple iterations.
@@ -55,7 +77,7 @@ existing contracts or slowing delivery.
 - Extract order creation/confirmation/refunds.
 - Connect orders with inventory (holds) via IDs and validations.
 
-## Phase 6: Admin tooling
+### Phase 6: Admin tooling
 **Exit criteria**
 - Admin endpoints stable.
 - Orchestration path clear across services.
@@ -67,6 +89,3 @@ existing contracts or slowing delivery.
 - **Contract drift**: mitigate with checklist + ADRs.
 - **Data ownership ambiguity**: mitigate with explicit ownership per service.
 - **Operational overhead**: delay extraction until metrics/logs ready.
-
-## Next step
-Use `docs/microservices/phase-1-checklist.md` to track Phase 1 completion.

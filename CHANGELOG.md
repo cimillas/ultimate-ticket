@@ -9,6 +9,7 @@ This project follows Semantic Versioning (SemVer).
 - Added `service` field in request logs with `SERVICE_NAME` env support.
 - Added `request_id` to error responses when available.
 - Updated observability and API docs, including metrics reference and Phase 1 checklist tracking.
+- Reorganized documentation into Diataxis categories and removed redundant READMEs.
 
 ## [0.6.0]
 - Added user-scoped orders endpoint (`GET /orders`) with hold context.
